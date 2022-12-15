@@ -10,6 +10,12 @@ set(NTSH_DEFINES "")
 add_subdirectory(external/Module)
 add_subdirectory(external/Common)
 
+find_package(OpenGL)
+
+if(NOT OpenGL_FOUND)
+	message(FATAL_ERROR "Could not find OpenGL library.")
+endif()
+
 list(APPEND NTSH_DEFINES NTSH_CURRENT_MODULE_GRAPHICS)
 
 set(MODULE_SOURCES
@@ -22,7 +28,7 @@ set(HEADERS ${MODULE_HEADERS})
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE NutshellEngine::Module NutshellEngine::Common)
+target_link_libraries(${PROJECT_NAME} PRIVATE NutshellEngine::Module NutshellEngine::Common opengl32)
 
 target_compile_options(${PROJECT_NAME} PRIVATE
 	$<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
