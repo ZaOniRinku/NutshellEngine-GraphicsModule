@@ -64,9 +64,9 @@ namespace NtshEngn {
 		void destroy();
 
 		// Loads the mesh described in the mesh parameter in the internal format and returns a unique identifier
-		NtshEngn::MeshId load(const NtshEngn::Mesh mesh);
+		NtshEngn::MeshId load(const NtshEngn::Mesh& mesh);
 		// Loads the image described in the image parameter in the internal format and returns a unique identifier
-		NtshEngn::ImageId load(const NtshEngn::Image image);
+		NtshEngn::ImageId load(const NtshEngn::Image& image);
 
 	public:
 		void onEntityComponentAdded(Entity entity, Component componentID);
@@ -184,6 +184,7 @@ namespace NtshEngn {
 		std::vector<InternalMesh> m_meshes;
 		int32_t m_currentVertexOffset = 0;
 		uint32_t m_currentIndexOffset = 0;
+		std::vector<const Mesh*> m_meshesAddresses;
 
 		std::vector<VkImage> m_textureImages;
 		std::vector<VmaAllocation> m_textureImageAllocations;
