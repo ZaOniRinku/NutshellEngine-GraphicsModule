@@ -88,6 +88,9 @@ namespace NtshEngn {
 
 		uint32_t findMipLevels(uint32_t width, uint32_t height);
 
+		// Check device extensions
+		bool deviceExtensionAvailable(const char* extensionName);
+
 		// Swapchain creation
 		void createSwapchain(VkSwapchainKHR oldSwapchain);
 

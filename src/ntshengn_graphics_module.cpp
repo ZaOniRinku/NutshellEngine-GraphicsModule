@@ -237,6 +237,12 @@ void NtshEngn::GraphicsModule::init() {
 	deviceCreateInfo.pQueueCreateInfos = &deviceQueueCreateInfo;
 	deviceCreateInfo.enabledLayerCount = 0;
 	deviceCreateInfo.ppEnabledLayerNames = nullptr;
+	deviceExtensionAvailable("VK_KHR_synchronization2");
+	deviceExtensionAvailable("VK_KHR_create_renderpass2");
+	deviceExtensionAvailable("VK_KHR_depth_stencil_resolve");
+	deviceExtensionAvailable("VK_KHR_dynamic_rendering");
+	deviceExtensionAvailable("VK_KHR_maintenance3");
+	deviceExtensionAvailable("VK_EXT_descriptor_indexing");
 	std::vector<const char*> deviceExtensions = { "VK_KHR_synchronization2",
 		"VK_KHR_create_renderpass2",
 		"VK_KHR_depth_stencil_resolve", 
@@ -1449,6 +1455,23 @@ VkPhysicalDeviceMemoryProperties NtshEngn::GraphicsModule::getMemoryProperties()
 
 uint32_t NtshEngn::GraphicsModule::findMipLevels(uint32_t width, uint32_t height) {
 	return static_cast<uint32_t>(std::floor(std::log2(std::min(width, height)) + 1));
+}
+
+bool NtshEngn::GraphicsModule::deviceExtensionAvailable(const char* extensionName) {
+	uint32_t deviceExtensionPropertyCount;
+	NTSHENGN_VK_CHECK(vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &deviceExtensionPropertyCount, nullptr));
+	std::vector<VkExtensionProperties> deviceExtensionProperties(deviceExtensionPropertyCount);
+	NTSHENGN_VK_CHECK(vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &deviceExtensionPropertyCount, deviceExtensionProperties.data()));
+
+	for (const VkExtensionProperties& availableExtension : deviceExtensionProperties) {
+		if (strcmp(availableExtension.extensionName, extensionName) == 0) {
+			return true;
+		}
+	}
+
+	NTSHENGN_MODULE_WARNING("Device extension " + std::string(extensionName) + " is not available.");
+
+	return false;
 }
 
 void NtshEngn::GraphicsModule::createSwapchain(VkSwapchainKHR oldSwapchain) {
