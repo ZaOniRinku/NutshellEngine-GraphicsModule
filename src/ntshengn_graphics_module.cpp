@@ -2021,8 +2021,8 @@ void NtshEngn::GraphicsModule::createDescriptorSets() {
 	texturesDescriptorPoolSize.descriptorCount = 524288;
 	
 	m_descriptorPools.resize(m_framesInFlight);
+	std::array<VkDescriptorPoolSize, 3> descriptorPoolSizes = { cameraDescriptorPoolSize, objectsDescriptorPoolSize, texturesDescriptorPoolSize };
 	for (uint32_t i = 0; i < m_framesInFlight; i++) {
-		std::array<VkDescriptorPoolSize, 3> descriptorPoolSizes = { cameraDescriptorPoolSize, objectsDescriptorPoolSize, texturesDescriptorPoolSize };
 		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
 		descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		descriptorPoolCreateInfo.pNext = nullptr;
@@ -2034,8 +2034,8 @@ void NtshEngn::GraphicsModule::createDescriptorSets() {
 	}
 
 	// Allocate descriptor sets
+	m_descriptorSets.resize(m_framesInFlight);
 	for (uint32_t i = 0; i < m_framesInFlight; i++) {
-		m_descriptorSets.resize(m_framesInFlight);
 		VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
 		descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		descriptorSetAllocateInfo.pNext = nullptr;
