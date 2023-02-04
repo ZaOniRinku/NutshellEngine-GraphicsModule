@@ -48,7 +48,10 @@ struct PushConstants {
 	float padding;
 	float cameraPosition[4];
 	float cameraDirection[4];
-};
+	float rootHeadPosition[4];
+	float rootCenterPosition[4];
+	float rootTailPosition[4];
+};								 
 
 namespace NtshEngn {
 
@@ -156,7 +159,7 @@ namespace NtshEngn {
 		uint32_t m_framesInFlight;
 		uint32_t m_currentFrameInFlight;
 
-		Entity m_mainCamera = std::numeric_limits<uint32_t>::max();;
+		Entity m_mainCamera = std::numeric_limits<uint32_t>::max();
 		bool m_mouseMiddleMode = true;
 		const float m_cameraSpeed = 0.0015f;
 		const float m_mouseSensitivity = 0.12f;
@@ -164,6 +167,8 @@ namespace NtshEngn {
 		int m_prevMouseY = 0;
 		float m_yaw = 0.0f;
 		float m_pitch = 0.0f;
+
+		Entity m_rootEntity = std::numeric_limits<uint32_t>::max();
 	};
 
 }

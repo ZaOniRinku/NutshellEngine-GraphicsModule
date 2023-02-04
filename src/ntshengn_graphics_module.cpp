@@ -744,7 +744,8 @@ void NtshEngn::GraphicsModule::update(double dt) {
 		vkCmdSetScissor(m_renderingCommandBuffers[m_currentFrameInFlight], 0, 1, &m_scissor);
 
 		// Push time constant
-		PushConstants pushConstants = { static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()) / 1000.0f, m_scissor.extent.width, m_scissor.extent.height, 0.0f, { cameraPosition[0], cameraPosition[1], cameraPosition[2], 0.0f }, { cameraDirection[0], cameraDirection[1], cameraDirection[2], 0.0f } };
+		const NtshEngn::Transform rootTransform = m_ecs->getComponent<Transform>(m_rootEntity);
+		PushConstants pushConstants = { static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()) / 1000.0f, m_scissor.extent.width, m_scissor.extent.height, 0.0f, { cameraPosition[0], cameraPosition[1], cameraPosition[2], 0.0f }, { cameraDirection[0], cameraDirection[1], cameraDirection[2], 0.0f }, { rootTransform.rotation[0], rootTransform.rotation[1], rootTransform.rotation[2], 0.0f }, { rootTransform.position[0], rootTransform.position[1], rootTransform.position[2], 0.0f }, { rootTransform.scale[0], rootTransform.scale[1], rootTransform.scale[2], 0.0f } };
 		vkCmdPushConstants(m_renderingCommandBuffers[m_currentFrameInFlight], m_graphicsPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &pushConstants);
 
 		// Draw
@@ -1327,6 +1328,7 @@ void NtshEngn::GraphicsModule::resize() {
 const NtshEngn::ComponentMask NtshEngn::GraphicsModule::getComponentMask() const {
 	ComponentMask componentMask;
 	componentMask.set(m_ecs->getComponentId<Camera>());
+	componentMask.set(m_ecs->getComponentId<Renderable>());
 
 	return componentMask;
 }
@@ -1336,6 +1338,9 @@ void NtshEngn::GraphicsModule::onEntityComponentAdded(Entity entity, Component c
 		if (m_mainCamera == std::numeric_limits<uint32_t>::max()) {
 			m_mainCamera = entity;
 		}
+	}
+	if (componentID == m_ecs->getComponentId<Renderable>()) {
+		m_rootEntity = entity;
 	}
 }
 
