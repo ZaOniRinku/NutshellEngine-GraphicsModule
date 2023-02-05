@@ -255,6 +255,20 @@ void NtshEngn::GraphicsModule::init() {
 	m_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(m_device, "vkCmdBeginRenderingKHR");
 	m_vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR");
 
+	// Initialize VMA
+	VmaAllocatorCreateInfo vmaAllocatorCreateInfo = {};
+	vmaAllocatorCreateInfo.flags = 0;
+	vmaAllocatorCreateInfo.physicalDevice = m_physicalDevice;
+	vmaAllocatorCreateInfo.device = m_device;
+	vmaAllocatorCreateInfo.preferredLargeHeapBlockSize = 0;
+	vmaAllocatorCreateInfo.pAllocationCallbacks = nullptr;
+	vmaAllocatorCreateInfo.pDeviceMemoryCallbacks = nullptr;
+	vmaAllocatorCreateInfo.pHeapSizeLimit = nullptr;
+	vmaAllocatorCreateInfo.pVulkanFunctions = nullptr;
+	vmaAllocatorCreateInfo.instance = m_instance;
+	vmaAllocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_1;
+	NTSHENGN_VK_CHECK(vmaCreateAllocator(&vmaAllocatorCreateInfo, &m_allocator));
+
 	// Create the swapchain
 	if (m_windowModule && m_windowModule->isOpen(NTSHENGN_MAIN_WINDOW)) {
 		createSwapchain(VK_NULL_HANDLE);
@@ -348,6 +362,21 @@ void NtshEngn::GraphicsModule::init() {
 		NTSHENGN_VK_CHECK(vkCreateImageView(m_device, &imageViewCreateInfo, nullptr, &m_drawImageView));
 	}
 
+	VkDescriptorSetLayoutBinding lightDescriptorSetLayoutBinding = {};
+	lightDescriptorSetLayoutBinding.binding = 0;
+	lightDescriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	lightDescriptorSetLayoutBinding.descriptorCount = 1;
+	lightDescriptorSetLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	lightDescriptorSetLayoutBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
+	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	descriptorSetLayoutCreateInfo.pNext = nullptr;
+	descriptorSetLayoutCreateInfo.flags = 0;
+	descriptorSetLayoutCreateInfo.bindingCount = 1;
+	descriptorSetLayoutCreateInfo.pBindings = &lightDescriptorSetLayoutBinding;
+	NTSHENGN_VK_CHECK(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCreateInfo, nullptr, &m_descriptorSetLayout));
+
 	// Create graphics pipeline
 	const std::vector<uint32_t> vertexShaderCode = { 0x07230203,0x00010000,0x0008000b,0x0000002c,0x00000000,0x00020011,0x00000001,0x0006000b,
 	0x00000001,0x4c534c47,0x6474732e,0x3035342e,0x00000000,0x0003000e,0x00000000,0x00000001,
@@ -424,8 +453,8 @@ void NtshEngn::GraphicsModule::init() {
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.pNext = nullptr;
 	pipelineLayoutCreateInfo.flags = 0;
-	pipelineLayoutCreateInfo.setLayoutCount = 0;
-	pipelineLayoutCreateInfo.pSetLayouts = nullptr;
+	pipelineLayoutCreateInfo.setLayoutCount = 1;
+	pipelineLayoutCreateInfo.pSetLayouts = &m_descriptorSetLayout;
 	pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 	pipelineLayoutCreateInfo.pPushConstantRanges = &fragmentShaderPushConstantRange;
 	NTSHENGN_VK_CHECK(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_graphicsPipelineLayout));
@@ -529,6 +558,75 @@ void NtshEngn::GraphicsModule::init() {
 		m_sceneLastModified = std::filesystem::last_write_time(m_sceneFileName);
 	}
 	recreateGraphicsPipeline();
+
+	// Create light buffer
+	m_lightBuffers.resize(m_framesInFlight);
+	m_lightBufferAllocations.resize(m_framesInFlight);
+	VkBufferCreateInfo lightBufferCreateInfo = {};
+	lightBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	lightBufferCreateInfo.pNext = nullptr;
+	lightBufferCreateInfo.flags = 0;
+	lightBufferCreateInfo.size = sizeof(nml::vec4) + 512 * sizeof(Light);
+	lightBufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	lightBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	lightBufferCreateInfo.queueFamilyIndexCount = 1;
+	lightBufferCreateInfo.pQueueFamilyIndices = &m_graphicsQueueIndex;
+
+	VmaAllocationCreateInfo bufferAllocationCreateInfo = {};
+	bufferAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+	bufferAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
+	for (uint32_t i = 0; i < m_framesInFlight; i++) {
+		vmaCreateBuffer(m_allocator, &lightBufferCreateInfo, &bufferAllocationCreateInfo, &m_lightBuffers[i], &m_lightBufferAllocations[i], nullptr);
+	}
+
+	// Create descriptor pool
+	VkDescriptorPoolSize lightDescriptorPoolSize = {};
+	lightDescriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	lightDescriptorPoolSize.descriptorCount = m_framesInFlight;
+
+	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
+	descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descriptorPoolCreateInfo.pNext = nullptr;
+	descriptorPoolCreateInfo.flags = 0;
+	descriptorPoolCreateInfo.maxSets = m_framesInFlight;
+	descriptorPoolCreateInfo.poolSizeCount = 1;
+	descriptorPoolCreateInfo.pPoolSizes = &lightDescriptorPoolSize;
+	NTSHENGN_VK_CHECK(vkCreateDescriptorPool(m_device, &descriptorPoolCreateInfo, nullptr, &m_descriptorPool));
+
+	// Allocate descriptor sets
+	m_descriptorSets.resize(m_framesInFlight);
+	for (uint32_t i = 0; i < m_framesInFlight; i++) {
+		VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
+		descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		descriptorSetAllocateInfo.pNext = nullptr;
+		descriptorSetAllocateInfo.descriptorPool = m_descriptorPool;
+		descriptorSetAllocateInfo.descriptorSetCount = 1;
+		descriptorSetAllocateInfo.pSetLayouts = &m_descriptorSetLayout;
+		NTSHENGN_VK_CHECK(vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, &m_descriptorSets[i]));
+	}
+
+	// Update descriptor sets
+	for (uint32_t i = 0; i < m_framesInFlight; i++) {
+		VkDescriptorBufferInfo lightDescriptorBufferInfo;
+		lightDescriptorBufferInfo.buffer = m_lightBuffers[i];
+		lightDescriptorBufferInfo.offset = 0;
+		lightDescriptorBufferInfo.range = sizeof(nml::vec4) + 512 * sizeof(Light);
+
+		VkWriteDescriptorSet lightWriteDescriptorSet;
+		lightWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		lightWriteDescriptorSet.pNext = nullptr;
+		lightWriteDescriptorSet.dstSet = m_descriptorSets[i];
+		lightWriteDescriptorSet.dstBinding = 0;
+		lightWriteDescriptorSet.dstArrayElement = 0;
+		lightWriteDescriptorSet.descriptorCount = 1;
+		lightWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		lightWriteDescriptorSet.pImageInfo = nullptr;
+		lightWriteDescriptorSet.pBufferInfo = &lightDescriptorBufferInfo;
+		lightWriteDescriptorSet.pTexelBufferView = nullptr;
+
+		vkUpdateDescriptorSets(m_device, 1, &lightWriteDescriptorSet, 0, nullptr);
+	}
 
 	// Resize buffers according to number of frames in flight and swapchain size
 	m_renderingCommandPools.resize(m_framesInFlight);
@@ -658,6 +756,19 @@ void NtshEngn::GraphicsModule::update(double dt) {
 		NTSHENGN_VK_CHECK(vkQueueSubmit(m_graphicsQueue, 1, &emptySignalSubmitInfo, VK_NULL_HANDLE));
 	}
 
+	void* data;
+
+	// Update light buffer
+	NTSHENGN_VK_CHECK(vmaMapMemory(m_allocator, m_lightBufferAllocations[m_currentFrameInFlight], &data));
+	uint32_t nbLights = static_cast<uint32_t>(m_lights.size());
+	memcpy(data, &nbLights, sizeof(uint32_t));
+	VkDeviceSize offset = 0;
+	for (size_t i = 0; i < m_lights.size(); i++) {
+		memcpy(reinterpret_cast<char*>(data) + offset + sizeof(nml::vec4), &m_lights[i], 2 * sizeof(nml::vec4));
+		offset += 2 * sizeof(nml::vec4);
+	}
+	vmaUnmapMemory(m_allocator, m_lightBufferAllocations[m_currentFrameInFlight]);
+
 	// Record rendering commands
 	NTSHENGN_VK_CHECK(vkResetCommandPool(m_device, m_renderingCommandPools[m_currentFrameInFlight], 0));
 
@@ -704,6 +815,9 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	undefinedToColorAttachmentOptimalDependencyInfo.pImageMemoryBarriers = &undefinedToColorAttachmentOptimalImageMemoryBarrier;
 
 	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &undefinedToColorAttachmentOptimalDependencyInfo);
+
+	// Bind descriptor set 0
+	vkCmdBindDescriptorSets(m_renderingCommandBuffers[m_currentFrameInFlight], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1, &m_descriptorSets[m_currentFrameInFlight], 0, nullptr);
 
 	// Begin rendering
 	VkRenderingAttachmentInfo renderingAttachmentInfo = {};
@@ -859,6 +973,14 @@ void NtshEngn::GraphicsModule::destroy() {
 		vkDestroyCommandPool(m_device, m_renderingCommandPools[i], nullptr);
 	}
 
+	// Destroy light buffers
+	for (uint32_t i = 0; i < m_framesInFlight; i++) {
+		vmaDestroyBuffer(m_allocator, m_lightBuffers[i], m_lightBufferAllocations[i]);
+	}
+
+	// Destroy descriptor pool
+	vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
+
 	// Destroy graphics pipeline
 	vkDestroyShaderModule(m_device, m_vertexShaderModule, nullptr);
 	if (m_fragmentShaderModule != VK_NULL_HANDLE) {
@@ -868,6 +990,9 @@ void NtshEngn::GraphicsModule::destroy() {
 	if (m_graphicsPipeline != VK_NULL_HANDLE) {
 		vkDestroyPipeline(m_device, m_graphicsPipeline, nullptr);
 	}
+
+	// Destroy descriptor set layout
+	vkDestroyDescriptorSetLayout(m_device, m_descriptorSetLayout, nullptr);
 
 	// Destroy swapchain
 	if (m_swapchain != VK_NULL_HANDLE) {
@@ -882,6 +1007,8 @@ void NtshEngn::GraphicsModule::destroy() {
 		vkDestroyImage(m_device, m_drawImage, nullptr);
 		vkFreeMemory(m_device, m_drawImageMemory, nullptr);
 	}
+
+	vmaDestroyAllocator(m_allocator);
 
 	// Destroy device
 	vkDestroyDevice(m_device, nullptr);
@@ -1329,6 +1456,7 @@ const NtshEngn::ComponentMask NtshEngn::GraphicsModule::getComponentMask() const
 	ComponentMask componentMask;
 	componentMask.set(m_ecs->getComponentId<Camera>());
 	componentMask.set(m_ecs->getComponentId<Renderable>());
+	componentMask.set(m_ecs->getComponentId<AABBCollidable>());
 
 	return componentMask;
 }
@@ -1339,8 +1467,21 @@ void NtshEngn::GraphicsModule::onEntityComponentAdded(Entity entity, Component c
 			m_mainCamera = entity;
 		}
 	}
-	if (componentID == m_ecs->getComponentId<Renderable>()) {
+	else if (componentID == m_ecs->getComponentId<Renderable>()) {
 		m_rootEntity = entity;
+	}
+	else if (componentID == m_ecs->getComponentId<AABBCollidable>()) {
+		const NtshEngn::Transform lightTransform = m_ecs->getComponent<Transform>(entity);
+		Light newLight;
+		newLight.position[0] = lightTransform.position[0];
+		newLight.position[1] = lightTransform.position[1];
+		newLight.position[2] = lightTransform.position[2];
+		newLight.position[3] = 0.0f;
+		newLight.color[0] = lightTransform.rotation[0];
+		newLight.color[1] = lightTransform.rotation[1];
+		newLight.color[2] = lightTransform.rotation[2];
+		newLight.color[3] = 0.0f;
+		m_lights.push_back(newLight);
 	}
 }
 
@@ -1349,6 +1490,10 @@ void NtshEngn::GraphicsModule::onEntityComponentRemoved(Entity entity, Component
 		if (m_mainCamera == entity) {
 			m_mainCamera = std::numeric_limits<uint32_t>::max();
 		}
+	}
+	else if (componentID == m_ecs->getComponentId<AABBCollidable>()) {
+		NtshEngn::Transform& lightTransform = m_ecs->getComponent<Transform>(entity);
+		lightTransform.position[3] = 1.0f;
 	}
 }
 

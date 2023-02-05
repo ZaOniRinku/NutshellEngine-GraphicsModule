@@ -11,7 +11,7 @@
 #elif defined(NTSHENGN_OS_LINUX)
 #define VK_USE_PLATFORM_XLIB_KHR
 #endif
-#include "vulkan/vulkan.h"
+#include "../external/VulkanMemoryAllocator/include/vk_mem_alloc.h"
 #include <vector>
 #include <filesystem>
 
@@ -51,13 +51,18 @@ struct PushConstants {
 	float rootHeadPosition[4];
 	float rootCenterPosition[4];
 	float rootTailPosition[4];
-};								 
+};				
+
+struct Light {
+	float position[4];
+	float color[4];
+};
 
 namespace NtshEngn {
 
 	class GraphicsModule : public GraphicsModuleInterface {
 	public:
-		GraphicsModule() : GraphicsModuleInterface("NutshellEngine Graphics Vulkan Raymarching Module") {}
+		GraphicsModule() : GraphicsModuleInterface("NutshellEngine Graphics GGJ23-Roots Module") {}
 
 		void init();
 		void update(double dt);
@@ -144,12 +149,21 @@ namespace NtshEngn {
 		VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
 		VkPipelineLayout m_graphicsPipelineLayout;
 
+		VkDescriptorSetLayout m_descriptorSetLayout;
+		VkDescriptorPool m_descriptorPool;
+		std::vector<VkDescriptorSet> m_descriptorSets;
+
 		std::vector<VkCommandPool> m_renderingCommandPools;
 		std::vector<VkCommandBuffer> m_renderingCommandBuffers;
 
 		std::vector<VkFence> m_fences;
 		std::vector<VkSemaphore> m_imageAvailableSemaphores;
 		std::vector<VkSemaphore> m_renderFinishedSemaphores;
+
+		VmaAllocator m_allocator;
+
+		std::vector<VkBuffer> m_lightBuffers;
+		std::vector<VmaAllocation> m_lightBufferAllocations;
 
 		PFN_vkCmdBeginRenderingKHR m_vkCmdBeginRenderingKHR;
 		PFN_vkCmdEndRenderingKHR m_vkCmdEndRenderingKHR;
@@ -169,6 +183,8 @@ namespace NtshEngn {
 		float m_pitch = 0.0f;
 
 		Entity m_rootEntity = std::numeric_limits<uint32_t>::max();
+
+		std::vector<Light> m_lights;
 	};
 
 }
