@@ -1,9 +1,19 @@
 #version 460
 #extension GL_GOOGLE_include_directive : enable
 
+struct Light {
+	vec4 position;
+	vec3 color;
+};
+
 layout(location = 0) in vec2 uv;
 
 layout(location = 0) out vec4 outColor;
+
+layout(set = 0, binding = 0) uniform Lighting {
+	uint nbLights;
+	Light lights[512];
+} light;
 
 layout(push_constant) uniform PushConstants {
 	float time;
@@ -11,6 +21,9 @@ layout(push_constant) uniform PushConstants {
 	uint height;
 	vec3 cameraPosition;
 	vec3 cameraDirection;
+	vec3 rootHeadPosition;
+	vec3 rootCenterPosition;
+	vec3 rootTailPosition;
 } pC;
 
 #include "raymarching_helper.glsl"
@@ -37,7 +50,7 @@ Object raymarch(vec3 o, vec3 d) {
 
 // Compute normal
 vec3 normal(vec3 p) {
-	const vec2 e = vec2(EPSILON, 0.0);
+	const vec2 e = vec2(0.01, 0.0);
 	const vec3 n = vec3(scene(p).dist) - vec3(scene(p - e.xyy).dist, scene(p - e.yxy).dist, scene(p - e.yyx).dist);
 
 	return normalize(n);
@@ -144,8 +157,7 @@ float ambientOcclusion(vec3 p, vec3 n) {
 
 // Render
 vec3 render(vec3 o, vec3 d) {
-	Light l[LIGHTS_COUNT] = lights();
-	const float fogDensity = 0.0008;
+	const float fogDensity = 0.0000005;
 
 	float frac = 1.0;
 	vec3 color = vec3(0.0, 0.0, 0.0);
@@ -165,11 +177,14 @@ vec3 render(vec3 o, vec3 d) {
 			const float ao = ambientOcclusion(p, n);
 
 			// Local color
-			for (int i = 0; i < LIGHTS_COUNT; i++) {
-				localColor += shade(p, d, n, l[i].position, l[i].color, diffuse, metallic, roughness) * shadows(p, n, l[i].position);
+			for (int i = 0; i < light.nbLights; i++) {
+				if (light.lights[i].position.w == 1.0) {
+					vec3 position = vec3(-light.lights[i].position.x, light.lights[i].position.y, light.lights[i].position.z);
+					localColor += shade(p, d, n, position, light.lights[i].color, diffuse, metallic, roughness) * shadows(p, n, position);
+				}
 			}
 			localColor *= ao;
-			localColor = mix(localColor, background(p), 1.0 - exp(-fogDensity * object.dist * object.dist));
+			localColor = mix(localColor, background(p) / 2.0, 1.0 - exp(-fogDensity * object.dist * object.dist));
 		}
 		else {
 			color += background(p) * frac;
@@ -198,7 +213,7 @@ void main() {
 	const vec2 newUv = (2.0 * (uv * dim) - dim) / pC.height;
 	vec3 d = cameraMatrix * normalize(vec3(newUv, 2.0));
 
-	vec3 color = render(pC.cameraPosition, d);
+	vec3 color = render(vec3(-pC.cameraPosition.x, pC.cameraPosition.yz), d);
 	
 	outColor = vec4(color, 1.0);
 }

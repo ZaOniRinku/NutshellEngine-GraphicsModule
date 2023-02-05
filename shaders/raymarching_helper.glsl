@@ -1,8 +1,8 @@
 #define M_PI 3.1415926535897932384626433832795
 
 const uint MAX_STEPS = 256;
-const float MAX_DISTANCE = 1000.0;
-const float EPSILON = 0.0001;
+const float MAX_DISTANCE = 5000.0;
+const float EPSILON = 0.001;
 const uint MAX_BOUNCES = 1;
 
 struct Material {
@@ -13,11 +13,6 @@ struct Material {
 struct Object {
 	float dist;
 	Material mat;
-};
-
-struct Light {
-	vec3 position;
-	vec3 color;
 };
 
 // Random functions
@@ -37,17 +32,7 @@ float noise(float seed) {
 }
 
 float noise(vec2 seed) {
-	const vec2 i = floor(seed);
-	const vec2 f = fract(seed);
-
-	const float a = rand(i);
-	const float b = rand(i + vec2(1.0, 0.0));
-	const float c = rand(i + vec2(0.0, 1.0));
-	const float d = rand(i + vec2(1.0, 1.0));
-
-	const vec2 u = smoothstep(0.0, 1.0, f);
-
-	return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+	return sin(seed.x) + sin(seed.y);
 }
 
 float noise(vec2 seed, float freq) {
@@ -67,18 +52,24 @@ float noise(vec2 seed, float freq) {
 	return mix(x1, x2, xy.y);
 }
 
-float fbm(vec2 seed, float H, uint numIters) {
-	float g = exp2(-H);
-	float f = 1.0;
-	float a = -1.0;
-	float t = 0.0;
-	for (uint i = 0; i < numIters; i++) {
-		t += a * noise(f * seed);
-		f *= 2.0;
-		a *= g;
+mat2 rotate(float a) {
+	float sina = sin(a);
+	float cosa = cos(a);
+
+	return mat2(cosa, -sina, sina, cosa);
+}
+
+float fbm(vec2 seed, uint numOctaves) {
+	float res = 0.0;
+	float amp = 0.5;
+	float freq = 1.95;
+	for (uint i = 0; i < numOctaves; i++) {
+		res += amp * noise(seed);
+		amp *= 0.5;
+		seed = seed * freq * rotate(M_PI / 2.0);
 	}
 
-	return t;
+	return res;
 }
 
 // Shapes
@@ -223,6 +214,59 @@ float shLink(vec3 p, float l, float r, float d) {
 	return length(vec2(length(q.xy) - d, q.z)) - r;
 }
 
+// Capsule
+// a = starting point
+// b = end point
+// r = radius
+float shCapsule(vec3 p, vec3 a, vec3 b, float r) {
+	const vec3 pa = p - a;
+	const vec3 ba = b - a;
+	const float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+
+	return length(pa - ba * h) - r;
+}
+
+// Bezier
+float shBezier(vec3 p, vec3 v1, vec3 v2, vec3 v3) {
+	vec3 c1 = p - v1;
+	vec3 c2 = 2.0 * v2 - v3 - v1;
+	vec3 c3 = v1 - v2;
+
+	float t3 = dot(c2, c2);
+	float t2 = dot(c3, c2) * 3.0 / t3;
+	float t1 = (dot(c1, c2) + 2.0 * dot(c3, c3)) / t3;
+	float t0 = dot(c1, c3) / t3;
+
+	float t22 = t2 * t2;
+	vec2 pq = vec2(t1 - t22 / 3.0, t22 * t2 / 13.5 - t2 * t1 / 3.0 + t0);
+	float ppp = pq.x * pq.x * pq.x, qq = pq.y * pq.y;
+
+	float p2 = abs(pq.x);
+	float r1 = 1.5 / pq.x * pq.y;
+
+	if (qq * 0.25 + ppp / 27.0 > 0.0) {
+		float r2 = r1 * sqrt(3.0 / p2);
+		float root;
+		if (pq.x < 0.0) {
+			root = sign(pq.y) * cosh(acosh(r2 * -sign(pq.y)) / 3.0);
+		}
+		else {
+			root = sinh(asinh(r2) / 3.0);
+		}
+		root = clamp(-2.0 * sqrt(p2 / 3.0) * root - t2 / 3.0, 0.0, 1.0);
+		
+		return length(p - mix(mix(v1, v2, root), mix(v2, v3, root), root));
+	}
+	else {
+		float ac = acos(r1 * sqrt(-3.0 / pq.x)) / 3.0;
+		vec2 roots = clamp(2.0 * sqrt(-pq.x / 3.0) * cos(vec2(ac, ac - 4.18879020479)) - t2 / 3.0, 0.0, 1.0);
+		vec3 p1 = p - mix(mix(v1, v2, roots.x), mix(v2, v3, roots.x), roots.x);
+		vec3 p2 = p - mix(mix(v1, v2, roots.y), mix(v2, v3, roots.y), roots.y);
+
+		return sqrt(min(dot(p1, p1), dot(p2, p2)));
+	}
+}
+
 // Operations
 Object opUnion(Object a, Object b) {
 	return a.dist < b.dist ? a : b;
@@ -276,6 +320,10 @@ Object opRound(Object o, float r) {
 
 Object opOnion(Object o, float t) {
 	return Object(abs(o.dist) - t, o.mat);
+}
+
+Object opPlus(Object a, Object b) {
+	return Object(a.dist + b.dist, a.mat);
 }
 
 // Transform
