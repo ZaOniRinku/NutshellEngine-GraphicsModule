@@ -14,6 +14,7 @@
 #include "../external/VulkanMemoryAllocator/include/vk_mem_alloc.h"
 #include <vector>
 #include <filesystem>
+#include <unordered_map>
 
 #define NTSHENGN_VK_CHECK(f) \
 	do { \
@@ -124,6 +125,7 @@ namespace NtshEngn {
 		VkImageView m_drawImageView;
 		VkDeviceMemory m_drawImageMemory;
 
+#if defined(NTSHENGN_DEBUG)
 		bool m_glslangInitialized = false;
 		const std::string m_fragmentShaderName = "raymarching.frag";
 		const std::string m_raymarchingHelperFileName = "raymarching_helper.glsl";
@@ -131,6 +133,7 @@ namespace NtshEngn {
 		std::filesystem::file_time_type m_fragmentShaderLastModified;
 		std::filesystem::file_time_type m_raymarchingHelperLastModified;
 		std::filesystem::file_time_type m_sceneLastModified;
+#endif
 		VkFormat m_pipelineRenderingColorFormat = VK_FORMAT_R8G8B8A8_SRGB;
 		VkPipelineRenderingCreateInfo m_pipelineRenderingCreateInfo{};
 		VkShaderModule m_vertexShaderModule;
@@ -184,7 +187,7 @@ namespace NtshEngn {
 
 		Entity m_rootEntity = std::numeric_limits<uint32_t>::max();
 
-		std::vector<Light> m_lights;
+		std::unordered_map<Entity, Light> m_lights;
 	};
 
 }
