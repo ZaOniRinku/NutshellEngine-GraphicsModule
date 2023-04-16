@@ -313,6 +313,7 @@ void NtshEngn::GraphicsModule::init() {
 		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 		VmaAllocationCreateInfo imageAllocationCreateInfo = {};
+		imageAllocationCreateInfo.flags = 0;
 		imageAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
 		NTSHENGN_VK_CHECK(vmaCreateImage(m_allocator, &imageCreateInfo, &imageAllocationCreateInfo, &m_drawImage, &m_drawImageAllocation, nullptr));
@@ -418,8 +419,8 @@ void NtshEngn::GraphicsModule::init() {
 	cameraBufferCreateInfo.pQueueFamilyIndices = &m_graphicsQueueFamilyIndex;
 
 	VmaAllocationCreateInfo bufferAllocationCreateInfo = {};
-	bufferAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
 	bufferAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+	bufferAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
 
 	for (uint32_t i = 0; i < m_framesInFlight; i++) {
 		NTSHENGN_VK_CHECK(vmaCreateBuffer(m_allocator, &cameraBufferCreateInfo, &bufferAllocationCreateInfo, &m_cameraBuffers[i], &m_cameraBufferAllocations[i], nullptr));
@@ -874,8 +875,8 @@ NtshEngn::MeshId NtshEngn::GraphicsModule::load(const NtshEngn::Mesh& mesh) {
 	vertexAndIndexStagingBufferCreateInfo.pQueueFamilyIndices = &m_graphicsQueueFamilyIndex;
 
 	VmaAllocationCreateInfo vertexAndIndexStagingBufferAllocationCreateInfo = {};
-	vertexAndIndexStagingBufferAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
 	vertexAndIndexStagingBufferAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+	vertexAndIndexStagingBufferAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
 	NTSHENGN_VK_CHECK(vmaCreateBuffer(m_allocator, &vertexAndIndexStagingBufferCreateInfo, &vertexAndIndexStagingBufferAllocationCreateInfo, &vertexAndIndexStagingBuffer, &vertexAndIndexStagingBufferAllocation, nullptr));
 
 	void* data;
@@ -1120,6 +1121,7 @@ NtshEngn::ImageId NtshEngn::GraphicsModule::load(const NtshEngn::Image& image) {
 	textureImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	VmaAllocationCreateInfo cubeTextureImageAllocationCreateInfo = {};
+	cubeTextureImageAllocationCreateInfo.flags = 0;
 	cubeTextureImageAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
 	NTSHENGN_VK_CHECK(vmaCreateImage(m_allocator, &textureImageCreateInfo, &cubeTextureImageAllocationCreateInfo, &textureImage, &textureImageAllocation, nullptr));
@@ -1157,8 +1159,8 @@ NtshEngn::ImageId NtshEngn::GraphicsModule::load(const NtshEngn::Image& image) {
 	textureStagingBufferCreateInfo.pQueueFamilyIndices = &m_graphicsQueueFamilyIndex;
 
 	VmaAllocationCreateInfo textureStagingBufferAllocationCreateInfo = {};
-	textureStagingBufferAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
 	textureStagingBufferAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+	textureStagingBufferAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
 	NTSHENGN_VK_CHECK(vmaCreateBuffer(m_allocator, &textureStagingBufferCreateInfo, &textureStagingBufferAllocationCreateInfo, &textureStagingBuffer, &textureStagingBufferAllocation, nullptr));
 
 	void* data;
@@ -1519,6 +1521,7 @@ void NtshEngn::GraphicsModule::createVertexAndIndexBuffers() {
 	vertexAndIndexBufferCreateInfo.pQueueFamilyIndices = &m_graphicsQueueFamilyIndex;
 
 	VmaAllocationCreateInfo vertexAndIndexBufferAllocationCreateInfo = {};
+	vertexAndIndexBufferAllocationCreateInfo.flags = 0;
 	vertexAndIndexBufferAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
 	NTSHENGN_VK_CHECK(vmaCreateBuffer(m_allocator, &vertexAndIndexBufferCreateInfo, &vertexAndIndexBufferAllocationCreateInfo, &m_vertexBuffer, &m_vertexBufferAllocation, nullptr));
@@ -1554,6 +1557,7 @@ void NtshEngn::GraphicsModule::createDepthImage() {
 	depthImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	VmaAllocationCreateInfo depthImageAllocationCreateInfo = {};
+	depthImageAllocationCreateInfo.flags = 0;
 	depthImageAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
 	NTSHENGN_VK_CHECK(vmaCreateImage(m_allocator, &depthImageCreateInfo, &depthImageAllocationCreateInfo, &m_depthImage, &m_depthImageAllocation, nullptr));
