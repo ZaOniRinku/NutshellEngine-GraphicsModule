@@ -95,6 +95,9 @@ namespace NtshEngn {
 		// Depth image creation
 		void createDepthImage();
 
+		// Descriptor set layout creation
+		void createDescriptorSetLayout();
+
 		// Graphics pipeline creation
 		void createGraphicsPipeline();
 
