@@ -2718,6 +2718,7 @@ void NtshEngn::GraphicsModule::createRayTracingPipeline() {
 			vec3 rayDirection;
 			uint rngState;
 			bool hitBackground;
+			bool countAsBounce;
 		};
 
 		layout(location = 0) rayPayloadEXT HitPayload payload;
@@ -2760,8 +2761,15 @@ void NtshEngn::GraphicsModule::createRayTracingPipeline() {
 			const float tMax = 10000.0;
 
 			const uint NUM_BOUNCES = 2;
-			for (uint i = 0; i < NUM_BOUNCES + 1; i++) {
+			for (int i = 0; i < NUM_BOUNCES + 1; i++) {
 				traceRayEXT(tlas, rayFlags, 0xFF, 0, 0, 0, origin, tMin, direction, tMax, 0);
+
+				if (!payload.countAsBounce) {
+					i--;
+					origin = payload.rayOrigin;
+					direction = payload.rayDirection;
+					continue;
+				}
 
 				color += payload.hitValue;
 
@@ -2821,13 +2829,15 @@ void NtshEngn::GraphicsModule::createRayTracingPipeline() {
 			vec3 rayDirection;
 			uint rngState;
 			bool hitBackground;
+			bool countAsBounce;
 		};
 
 		layout(location = 0) rayPayloadInEXT HitPayload payload;
 
 		void main() {
-			payload.hitValue = vec3(0.0);
+			payload.hitValue = vec3(0.22, 0.66, 0.94) * 0.01;
 			payload.hitBackground = true;
+			payload.countAsBounce = true;
 		}
 	)GLSL";
 	const std::vector<uint32_t> rayMissShaderSpv = compileShader(rayMissShaderCode, ShaderType::RayMiss);
@@ -2981,6 +2991,7 @@ void NtshEngn::GraphicsModule::createRayTracingPipeline() {
 			vec3 rayDirection;
 			uint rngState;
 			bool hitBackground;
+			bool countAsBounce;
 		};
 
 		layout(location = 0) rayPayloadInEXT HitPayload payload;
@@ -3139,6 +3150,13 @@ void NtshEngn::GraphicsModule::createRayTracingPipeline() {
 
 			// Material
 			vec4 diffuseSample = texture(textures[material.diffuseTextureIndex], uv);
+			if (diffuseSample.a < 1.0) {
+				payload.countAsBounce = false;
+				payload.rayOrigin = offsetPositionAlongNormal(worldPosition, gl_WorldRayDirectionEXT);
+				payload.rayDirection = gl_WorldRayDirectionEXT;
+				payload.hitBackground = false;
+				return;
+			}
 			vec3 normalSample = texture(textures[material.normalTextureIndex], uv).xyz;
 			float metalnessSample = texture(textures[material.metalnessTextureIndex], uv).b;
 			float roughnessSample = texture(textures[material.roughnessTextureIndex], uv).g;
@@ -3197,6 +3215,7 @@ void NtshEngn::GraphicsModule::createRayTracingPipeline() {
 			payload.rayOrigin = offsetPositionAlongNormal(worldPosition, n);
 			payload.rayDirection = randomDiffuseDirection(n, payload.rngState);
 			payload.hitBackground = false;
+			payload.countAsBounce = true;
 		}
 	)GLSL";
 	const std::vector<uint32_t> rayClosestHitShaderSpv = compileShader(rayClosestHitShaderCode, ShaderType::RayClosestHit);
