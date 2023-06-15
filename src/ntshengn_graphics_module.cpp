@@ -94,23 +94,22 @@ void NtshEngn::GraphicsModule::init() {
 	// Create surface
 	if (m_windowModule && m_windowModule->isOpen(NTSHENGN_MAIN_WINDOW)) {
 #if defined(NTSHENGN_OS_WINDOWS)
-		HWND windowHandle = m_windowModule->getNativeHandle(NTSHENGN_MAIN_WINDOW);
+		HWND windowHandle = reinterpret_cast<HWND>(m_windowModule->getNativeHandle(NTSHENGN_MAIN_WINDOW));
 		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 		surfaceCreateInfo.pNext = nullptr;
 		surfaceCreateInfo.flags = 0;
-		surfaceCreateInfo.hinstance = reinterpret_cast<HINSTANCE>(GetWindowLongPtr(windowHandle, GWLP_HINSTANCE));
+		surfaceCreateInfo.hinstance = reinterpret_cast<HINSTANCE>(m_windowModule->getNativeAdditionalInformation(NTSHENGN_MAIN_WINDOW));
 		surfaceCreateInfo.hwnd = windowHandle;
 		auto createWin32SurfaceKHR = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(m_instance, "vkCreateWin32SurfaceKHR");
 		NTSHENGN_VK_CHECK(createWin32SurfaceKHR(m_instance, &surfaceCreateInfo, nullptr, &m_surface));
 #elif defined(NTSHENGN_OS_LINUX)
-		m_display = XOpenDisplay(NULL);
-		Window windowHandle = m_windowModule->getNativeHandle(NTSHENGN_MAIN_WINDOW);
+		Window windowHandle = reinterpret_cast<Window>(m_windowModule->getNativeHandle(NTSHENGN_MAIN_WINDOW));
 		VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
 		surfaceCreateInfo.pNext = nullptr;
 		surfaceCreateInfo.flags = 0;
-		surfaceCreateInfo.dpy = m_display;
+		surfaceCreateInfo.dpy = reinterpret_cast<Display*>(m_windowModule->getNativeAdditionalInformation(NTSHENGN_MAIN_WINDOW));
 		surfaceCreateInfo.window = windowHandle;
 		auto createXlibSurfaceKHR = (PFN_vkCreateXlibSurfaceKHR)vkGetInstanceProcAddr(m_instance, "vkCreateXlibSurfaceKHR");
 		NTSHENGN_VK_CHECK(createXlibSurfaceKHR(m_instance, &surfaceCreateInfo, nullptr, &m_surface));
@@ -839,11 +838,6 @@ void NtshEngn::GraphicsModule::destroy() {
 		vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
 	}
 
-#if defined(NTSHENGN_OS_LINUX)
-	// Close X display
-	XCloseDisplay(m_display);
-#endif
-
 #if defined(NTSHENGN_DEBUG)
 	// Destroy debug messenger
 	auto destroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -1367,9 +1361,9 @@ void NtshEngn::GraphicsModule::onEntityComponentAdded(Entity entity, Component c
 		if (renderable.mesh->vertices.size() != 0) {
 			object.meshIndex = load(*renderable.mesh);
 		}
-		if (renderable.material->diffuseTexture.first) {
-			ImageId imageId = static_cast<uint32_t>(load(*renderable.material->diffuseTexture.first));
-			uint32_t samplerId = createSampler(renderable.material->diffuseTexture.second);
+		if (renderable.material->diffuseTexture.image) {
+			ImageId imageId = static_cast<uint32_t>(load(*renderable.material->diffuseTexture.image));
+			uint32_t samplerId = createSampler(renderable.material->diffuseTexture.imageSampler);
 			m_textures.push_back({ static_cast<uint32_t>(imageId), samplerId });
 			object.textureIndex = static_cast<uint32_t>(m_textures.size()) - 1;
 		}
