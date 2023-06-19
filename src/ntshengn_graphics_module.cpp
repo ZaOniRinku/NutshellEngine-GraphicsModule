@@ -98,23 +98,22 @@ void NtshEngn::GraphicsModule::init() {
 	// Create surface
 	if (m_windowModule && m_windowModule->isOpen(NTSHENGN_MAIN_WINDOW)) {
 #if defined(NTSHENGN_OS_WINDOWS)
-		HWND windowHandle = m_windowModule->getNativeHandle(NTSHENGN_MAIN_WINDOW);
+		HWND windowHandle = reinterpret_cast<HWND>(m_windowModule->getNativeHandle(NTSHENGN_MAIN_WINDOW));
 		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 		surfaceCreateInfo.pNext = nullptr;
 		surfaceCreateInfo.flags = 0;
-		surfaceCreateInfo.hinstance = reinterpret_cast<HINSTANCE>(GetWindowLongPtr(windowHandle, GWLP_HINSTANCE));
+		surfaceCreateInfo.hinstance = reinterpret_cast<HINSTANCE>(m_windowModule->getNativeAdditionalInformation(NTSHENGN_MAIN_WINDOW));
 		surfaceCreateInfo.hwnd = windowHandle;
 		auto createWin32SurfaceKHR = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(m_instance, "vkCreateWin32SurfaceKHR");
 		NTSHENGN_VK_CHECK(createWin32SurfaceKHR(m_instance, &surfaceCreateInfo, nullptr, &m_surface));
 #elif defined(NTSHENGN_OS_LINUX)
-		m_display = XOpenDisplay(NULL);
-		Window windowHandle = m_windowModule->getNativeHandle(NTSHENGN_MAIN_WINDOW);
+		Window windowHandle = reinterpret_cast<Window>(m_windowModule->getNativeHandle(NTSHENGN_MAIN_WINDOW));
 		VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
 		surfaceCreateInfo.pNext = nullptr;
 		surfaceCreateInfo.flags = 0;
-		surfaceCreateInfo.dpy = m_display;
+		surfaceCreateInfo.dpy = reinterpret_cast<Display*>(m_windowModule->getNativeAdditionalInformation(NTSHENGN_MAIN_WINDOW));;
 		surfaceCreateInfo.window = windowHandle;
 		auto createXlibSurfaceKHR = (PFN_vkCreateXlibSurfaceKHR)vkGetInstanceProcAddr(m_instance, "vkCreateXlibSurfaceKHR");
 		NTSHENGN_VK_CHECK(createXlibSurfaceKHR(m_instance, &surfaceCreateInfo, nullptr, &m_surface));
@@ -568,7 +567,7 @@ void NtshEngn::GraphicsModule::init() {
 	lightBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	lightBufferCreateInfo.pNext = nullptr;
 	lightBufferCreateInfo.flags = 0;
-	lightBufferCreateInfo.size = sizeof(nml::vec4) + 512 * sizeof(Light);
+	lightBufferCreateInfo.size = sizeof(nml::vec4) + 512 * sizeof(GGJRootsLight);
 	lightBufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 	lightBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	lightBufferCreateInfo.queueFamilyIndexCount = 1;
@@ -613,7 +612,7 @@ void NtshEngn::GraphicsModule::init() {
 		VkDescriptorBufferInfo lightDescriptorBufferInfo;
 		lightDescriptorBufferInfo.buffer = m_lightBuffers[i];
 		lightDescriptorBufferInfo.offset = 0;
-		lightDescriptorBufferInfo.range = sizeof(nml::vec4) + 512 * sizeof(Light);
+		lightDescriptorBufferInfo.range = sizeof(nml::vec4) + 512 * sizeof(GGJRootsLight);
 
 		VkWriteDescriptorSet lightWriteDescriptorSet;
 		lightWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1021,11 +1020,6 @@ void NtshEngn::GraphicsModule::destroy() {
 	if (m_surface != VK_NULL_HANDLE) {
 		vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
 	}
-
-#if defined(NTSHENGN_OS_LINUX)
-	// Close X display
-	XCloseDisplay(m_display);
-#endif
 
 #if defined(NTSHENGN_DEBUG)
 	// Destroy debug messenger
@@ -2663,7 +2657,7 @@ void NtshEngn::GraphicsModule::onEntityComponentAdded(Entity entity, Component c
 	}
 	else if (componentID == m_ecs->getComponentId<AABBCollidable>()) {
 		const NtshEngn::Transform lightTransform = m_ecs->getComponent<Transform>(entity);
-		Light newLight;
+		GGJRootsLight newLight;
 		newLight.position[0] = lightTransform.position[0];
 		newLight.position[1] = lightTransform.position[1];
 		newLight.position[2] = lightTransform.position[2];

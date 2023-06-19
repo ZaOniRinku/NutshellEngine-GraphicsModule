@@ -54,7 +54,7 @@ struct PushConstants {
 	float rootTailPosition[4];
 };				
 
-struct Light {
+struct GGJRootsLight {
 	float position[4];
 	float color[4];
 };
@@ -103,9 +103,6 @@ namespace NtshEngn {
 		VkDebugUtilsMessengerEXT m_debugMessenger;
 #endif
 
-#if defined(NTSHENGN_OS_LINUX)
-		Display* m_display = nullptr;
-#endif
 		VkSurfaceKHR m_surface = VK_NULL_HANDLE;
 
 		VkPhysicalDevice m_physicalDevice;
@@ -187,7 +184,7 @@ namespace NtshEngn {
 
 		Entity m_rootEntity = std::numeric_limits<uint32_t>::max();
 
-		std::unordered_map<Entity, Light> m_lights;
+		std::unordered_map<Entity, GGJRootsLight> m_lights;
 	};
 
 }
