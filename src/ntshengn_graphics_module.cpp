@@ -1046,7 +1046,7 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	VkDependencyInfo startFrameDependencyInfo = {};
 	startFrameDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	startFrameDependencyInfo.pNext = nullptr;
-	startFrameDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	startFrameDependencyInfo.dependencyFlags = 0;
 	startFrameDependencyInfo.memoryBarrierCount = 0;
 	startFrameDependencyInfo.pMemoryBarriers = nullptr;
 	startFrameDependencyInfo.bufferMemoryBarrierCount = 0;
@@ -1153,7 +1153,7 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	VkDependencyInfo compositingDependencyInfo = {};
 	compositingDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	compositingDependencyInfo.pNext = nullptr;
-	compositingDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	compositingDependencyInfo.dependencyFlags = 0;
 	compositingDependencyInfo.memoryBarrierCount = 0;
 	compositingDependencyInfo.pMemoryBarriers = nullptr;
 	compositingDependencyInfo.bufferMemoryBarrierCount = 0;
@@ -1226,7 +1226,7 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	VkDependencyInfo toneMappingDependencyInfo = {};
 	toneMappingDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	toneMappingDependencyInfo.pNext = nullptr;
-	toneMappingDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	toneMappingDependencyInfo.dependencyFlags = 0;
 	toneMappingDependencyInfo.memoryBarrierCount = 0;
 	toneMappingDependencyInfo.pMemoryBarriers = nullptr;
 	toneMappingDependencyInfo.bufferMemoryBarrierCount = 0;
@@ -1343,7 +1343,7 @@ void NtshEngn::GraphicsModule::update(double dt) {
 		VkDependencyInfo colorAttachmentToPresentSrcDependencyInfo = {};
 		colorAttachmentToPresentSrcDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 		colorAttachmentToPresentSrcDependencyInfo.pNext = nullptr;
-		colorAttachmentToPresentSrcDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		colorAttachmentToPresentSrcDependencyInfo.dependencyFlags = 0;
 		colorAttachmentToPresentSrcDependencyInfo.memoryBarrierCount = 0;
 		colorAttachmentToPresentSrcDependencyInfo.pMemoryBarriers = nullptr;
 		colorAttachmentToPresentSrcDependencyInfo.bufferMemoryBarrierCount = 0;
@@ -1939,7 +1939,7 @@ NtshEngn::ImageID NtshEngn::GraphicsModule::load(const Image& image) {
 	VkDependencyInfo undefinedToTransferDstDependencyInfo = {};
 	undefinedToTransferDstDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	undefinedToTransferDstDependencyInfo.pNext = nullptr;
-	undefinedToTransferDstDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	undefinedToTransferDstDependencyInfo.dependencyFlags = 0;
 	undefinedToTransferDstDependencyInfo.memoryBarrierCount = 0;
 	undefinedToTransferDstDependencyInfo.pMemoryBarriers = nullptr;
 	undefinedToTransferDstDependencyInfo.bufferMemoryBarrierCount = 0;
@@ -1978,7 +1978,7 @@ NtshEngn::ImageID NtshEngn::GraphicsModule::load(const Image& image) {
 	VkDependencyInfo mipmapGenerationDependencyInfo = {};
 	mipmapGenerationDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	mipmapGenerationDependencyInfo.pNext = nullptr;
-	mipmapGenerationDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	mipmapGenerationDependencyInfo.dependencyFlags = 0;
 	mipmapGenerationDependencyInfo.memoryBarrierCount = 0;
 	mipmapGenerationDependencyInfo.pMemoryBarriers = nullptr;
 	mipmapGenerationDependencyInfo.bufferMemoryBarrierCount = 0;
@@ -2209,7 +2209,7 @@ NtshEngn::FontID NtshEngn::GraphicsModule::load(const Font& font) {
 	VkDependencyInfo undefinedToTransferDstDependencyInfo = {};
 	undefinedToTransferDstDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	undefinedToTransferDstDependencyInfo.pNext = nullptr;
-	undefinedToTransferDstDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	undefinedToTransferDstDependencyInfo.dependencyFlags = 0;
 	undefinedToTransferDstDependencyInfo.memoryBarrierCount = 0;
 	undefinedToTransferDstDependencyInfo.pMemoryBarriers = nullptr;
 	undefinedToTransferDstDependencyInfo.bufferMemoryBarrierCount = 0;
@@ -3459,7 +3459,7 @@ void NtshEngn::GraphicsModule::createCompositingImage() {
 	VkDependencyInfo dependencyInfo = {};
 	dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dependencyInfo.pNext = nullptr;
-	dependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	dependencyInfo.dependencyFlags = 0;
 	dependencyInfo.memoryBarrierCount = 0;
 	dependencyInfo.pMemoryBarriers = nullptr;
 	dependencyInfo.bufferMemoryBarrierCount = 0;
@@ -3999,7 +3999,7 @@ void NtshEngn::GraphicsModule::createToneMappingImage() {
 	VkDependencyInfo dependencyInfo = {};
 	dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dependencyInfo.pNext = nullptr;
-	dependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	dependencyInfo.dependencyFlags = 0;
 	dependencyInfo.memoryBarrierCount = 0;
 	dependencyInfo.pMemoryBarriers = nullptr;
 	dependencyInfo.bufferMemoryBarrierCount = 0;

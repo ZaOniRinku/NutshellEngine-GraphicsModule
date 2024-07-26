@@ -108,36 +108,17 @@ void Bloom::draw(VkCommandBuffer commandBuffer, VkImage drawImage, VkImageView d
 	bloomImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
 	bloomImageMemoryBarrier.subresourceRange.layerCount = 1;
 
-	VkImageMemoryBarrier2 blurImageMemoryBarrier = {};
-	blurImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-	blurImageMemoryBarrier.pNext = nullptr;
-	blurImageMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-	blurImageMemoryBarrier.srcAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-	blurImageMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-	blurImageMemoryBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-	blurImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	blurImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	blurImageMemoryBarrier.srcQueueFamilyIndex = m_graphicsQueueFamilyIndex;
-	blurImageMemoryBarrier.dstQueueFamilyIndex = m_graphicsQueueFamilyIndex;
-	blurImageMemoryBarrier.image = m_blurImage.handle;
-	blurImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	blurImageMemoryBarrier.subresourceRange.baseMipLevel = 0;
-	blurImageMemoryBarrier.subresourceRange.levelCount = m_mipLevels;
-	blurImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
-	blurImageMemoryBarrier.subresourceRange.layerCount = 1;
-
-	std::array<VkImageMemoryBarrier2, 2> bloomBlurImageMemoryBarriers = { bloomImageMemoryBarrier, blurImageMemoryBarrier };
-	VkDependencyInfo bloomBlurDependencyInfo = {};
-	bloomBlurDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-	bloomBlurDependencyInfo.pNext = nullptr;
-	bloomBlurDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-	bloomBlurDependencyInfo.memoryBarrierCount = 0;
-	bloomBlurDependencyInfo.pMemoryBarriers = nullptr;
-	bloomBlurDependencyInfo.bufferMemoryBarrierCount = 0;
-	bloomBlurDependencyInfo.pBufferMemoryBarriers = nullptr;
-	bloomBlurDependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(bloomBlurImageMemoryBarriers.size());
-	bloomBlurDependencyInfo.pImageMemoryBarriers = bloomBlurImageMemoryBarriers.data();
-	m_vkCmdPipelineBarrier2KHR(commandBuffer, &bloomBlurDependencyInfo);
+	VkDependencyInfo bloomDependencyInfo = {};
+	bloomDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	bloomDependencyInfo.pNext = nullptr;
+	bloomDependencyInfo.dependencyFlags = 0;
+	bloomDependencyInfo.memoryBarrierCount = 0;
+	bloomDependencyInfo.pMemoryBarriers = nullptr;
+	bloomDependencyInfo.bufferMemoryBarrierCount = 0;
+	bloomDependencyInfo.pBufferMemoryBarriers = nullptr;
+	bloomDependencyInfo.imageMemoryBarrierCount = 1;
+	bloomDependencyInfo.pImageMemoryBarriers = &bloomImageMemoryBarrier;
+	m_vkCmdPipelineBarrier2KHR(commandBuffer, &bloomDependencyInfo);
 
 	// Resize and Threshold
 	VkRenderingAttachmentInfo resizeThresholdAttachmentInfo = {};
@@ -214,7 +195,7 @@ void Bloom::draw(VkCommandBuffer commandBuffer, VkImage drawImage, VkImageView d
 	VkDependencyInfo resizeThresholdDependencyInfo = {};
 	resizeThresholdDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	resizeThresholdDependencyInfo.pNext = nullptr;
-	resizeThresholdDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	resizeThresholdDependencyInfo.dependencyFlags = 0;
 	resizeThresholdDependencyInfo.memoryBarrierCount = 0;
 	resizeThresholdDependencyInfo.pMemoryBarriers = nullptr;
 	resizeThresholdDependencyInfo.bufferMemoryBarrierCount = 0;
@@ -316,7 +297,7 @@ void Bloom::draw(VkCommandBuffer commandBuffer, VkImage drawImage, VkImageView d
 		VkDependencyInfo blurHorizontalDependencyInfo = {};
 		blurHorizontalDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 		blurHorizontalDependencyInfo.pNext = nullptr;
-		blurHorizontalDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		blurHorizontalDependencyInfo.dependencyFlags = 0;
 		blurHorizontalDependencyInfo.memoryBarrierCount = 0;
 		blurHorizontalDependencyInfo.pMemoryBarriers = nullptr;
 		blurHorizontalDependencyInfo.bufferMemoryBarrierCount = 0;
@@ -381,16 +362,35 @@ void Bloom::draw(VkCommandBuffer commandBuffer, VkImage drawImage, VkImageView d
 		blurVerticalBloomImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
 		blurVerticalBloomImageMemoryBarrier.subresourceRange.layerCount = 1;
 
+		VkImageMemoryBarrier2 blurVerticalBlurImageMemoryBarrier = {};
+		blurVerticalBlurImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		blurVerticalBlurImageMemoryBarrier.pNext = nullptr;
+		blurVerticalBlurImageMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+		blurVerticalBlurImageMemoryBarrier.srcAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+		blurVerticalBlurImageMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+		blurVerticalBlurImageMemoryBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+		blurVerticalBlurImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		blurVerticalBlurImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		blurVerticalBlurImageMemoryBarrier.srcQueueFamilyIndex = m_graphicsQueueFamilyIndex;
+		blurVerticalBlurImageMemoryBarrier.dstQueueFamilyIndex = m_graphicsQueueFamilyIndex;
+		blurVerticalBlurImageMemoryBarrier.image = m_blurImage.handle;
+		blurVerticalBlurImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		blurVerticalBlurImageMemoryBarrier.subresourceRange.baseMipLevel = mipLevel;
+		blurVerticalBlurImageMemoryBarrier.subresourceRange.levelCount = 1;
+		blurVerticalBlurImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
+		blurVerticalBlurImageMemoryBarrier.subresourceRange.layerCount = 1;
+
+		std::array<VkImageMemoryBarrier2, 2> blurVerticalImageMemoryBarriers = { blurVerticalBloomImageMemoryBarrier, blurVerticalBlurImageMemoryBarrier };
 		VkDependencyInfo blurVerticalDependencyInfo = {};
 		blurVerticalDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 		blurVerticalDependencyInfo.pNext = nullptr;
-		blurVerticalDependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		blurVerticalDependencyInfo.dependencyFlags = 0;
 		blurVerticalDependencyInfo.memoryBarrierCount = 0;
 		blurVerticalDependencyInfo.pMemoryBarriers = nullptr;
 		blurVerticalDependencyInfo.bufferMemoryBarrierCount = 0;
 		blurVerticalDependencyInfo.pBufferMemoryBarriers = nullptr;
-		blurVerticalDependencyInfo.imageMemoryBarrierCount = 1;
-		blurVerticalDependencyInfo.pImageMemoryBarriers = &blurVerticalBloomImageMemoryBarrier;
+		blurVerticalDependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(blurVerticalImageMemoryBarriers.size());
+		blurVerticalDependencyInfo.pImageMemoryBarriers = blurVerticalImageMemoryBarriers.data();
 		m_vkCmdPipelineBarrier2KHR(commandBuffer, &blurVerticalDependencyInfo);
 	}
 
@@ -569,7 +569,7 @@ void Bloom::createImages(uint32_t width, uint32_t height) {
 	VkDependencyInfo dependencyInfo = {};
 	dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dependencyInfo.pNext = nullptr;
-	dependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	dependencyInfo.dependencyFlags = 0;
 	dependencyInfo.memoryBarrierCount = 0;
 	dependencyInfo.pMemoryBarriers = nullptr;
 	dependencyInfo.bufferMemoryBarrierCount = 0;
