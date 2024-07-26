@@ -571,6 +571,23 @@ void NtshEngn::GraphicsModule::init() {
 
 	createCompositingResources();
 
+#if BLOOM_ENABLE == 1
+	m_bloom.init(m_device,
+		m_graphicsComputeQueue,
+		m_graphicsComputeQueueFamilyIndex,
+		m_allocator,
+		m_compositingImage.view,
+		m_compositingImageFormat,
+		m_initializationCommandPool,
+		m_initializationCommandBuffer,
+		m_initializationFence,
+		m_viewport,
+		m_scissor,
+		m_vkCmdBeginRenderingKHR,
+		m_vkCmdEndRenderingKHR,
+		m_vkCmdPipelineBarrier2KHR);
+#endif
+
 	createToneMappingResources();
 
 	m_fxaa.init(m_device,
@@ -1144,6 +1161,13 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	compositingDependencyInfo.imageMemoryBarrierCount = 1;
 	compositingDependencyInfo.pImageMemoryBarriers = &compositingColorAttachmentToFragmentImageMemoryBarrier;
 	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &compositingDependencyInfo);
+
+#if BLOOM_ENABLE == 1
+	// Bloom
+	m_bloom.draw(m_renderingCommandBuffers[m_currentFrameInFlight], m_compositingImage.handle, m_compositingImage.view);
+
+	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &compositingDependencyInfo);
+#endif
 	
 	// Tone mapping
 	VkRenderingAttachmentInfo toneMappingAttachmentInfo = {};
@@ -1466,6 +1490,11 @@ void NtshEngn::GraphicsModule::destroy() {
 	vkDestroyDescriptorSetLayout(m_device, m_toneMappingDescriptorSetLayout, nullptr);
 	vkDestroySampler(m_device, m_toneMappingSampler, nullptr);
 	m_toneMappingImage.destroy(m_device, m_allocator);
+
+#if BLOOM_ENABLE == 1
+	// Destroy bloom
+	m_bloom.destroy();
+#endif
 
 	// Destroy compositing resources
 	vkDestroyDescriptorPool(m_device, m_compositingDescriptorPool, nullptr);
@@ -5356,6 +5385,11 @@ void NtshEngn::GraphicsModule::resize() {
 
 		// Resize SSAO
 		m_ssao.onResize(static_cast<uint32_t>(windowModule->getWindowWidth(windowModule->getMainWindowID())), static_cast<uint32_t>(windowModule->getWindowHeight(windowModule->getMainWindowID())), m_gBuffer.getPosition().view, m_gBuffer.getNormal().view);
+
+#if BLOOM_ENABLE == 1
+		// Resize bloom
+		m_bloom.onResize(static_cast<uint32_t>(windowModule->getWindowWidth(windowModule->getMainWindowID())), static_cast<uint32_t>(windowModule->getWindowHeight(windowModule->getMainWindowID())), m_compositingImage.view);
+#endif
 
 		// Resize FXAA
 		m_fxaa.onResize(static_cast<uint32_t>(windowModule->getWindowWidth(windowModule->getMainWindowID())), static_cast<uint32_t>(windowModule->getWindowHeight(windowModule->getMainWindowID())), m_toneMappingImage.view);
