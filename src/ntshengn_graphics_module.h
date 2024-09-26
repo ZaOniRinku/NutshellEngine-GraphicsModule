@@ -83,12 +83,18 @@ struct HostVisibleBuffer {
 	VmaAllocation allocation;
 };
 
+struct DeviceBuffer {
+	VkBuffer handle;
+	VmaAllocation allocation;
+};
+
 enum class ShaderType {
 	Vertex,
 	TesselationControl,
 	TesselationEvaluation,
 	Geometry,
-	Fragment
+	Fragment,
+	Compute
 };
 
 struct InternalMesh {
@@ -189,6 +195,12 @@ struct InternalUIImage {
 	NtshEngn::Math::vec2 reverseUV = { 0.0f, 0.0f };
 };
 
+struct Particle {
+	NtshEngn::Math::vec4 position = { 0.0f, 0.0f, 0.0f, 0.0f };
+	NtshEngn::Math::vec4 color = { 0.0f, 0.0f, 0.0f, 0.0f };
+	NtshEngn::Math::vec4 velocity = { 0.0f, 0.0f, 0.0f, 0.0f };
+};
+
 namespace NtshEngn {
 
 	class GraphicsModule : public GraphicsModuleInterface {
@@ -266,6 +278,9 @@ namespace NtshEngn {
 		void createDescriptorSets();
 		void updateDescriptorSet(uint32_t frameInFlight);
 
+		// Particles resources
+		void createParticleResources();
+
 		// Tone mapping resources
 		void createToneMappingResources();
 
@@ -314,8 +329,8 @@ namespace NtshEngn {
 		VkSurfaceKHR m_surface = VK_NULL_HANDLE;
 
 		VkPhysicalDevice m_physicalDevice;
-		uint32_t m_graphicsQueueFamilyIndex;
-		VkQueue m_graphicsQueue;
+		uint32_t m_graphicsComputeQueueFamilyIndex;
+		VkQueue m_graphicsComputeQueue;
 		VkDevice m_device;
 
 		VkViewport m_viewport;
@@ -355,6 +370,20 @@ namespace NtshEngn {
 		VkDescriptorPool m_descriptorPool;
 		std::vector<VkDescriptorSet> m_descriptorSets;
 		std::vector<bool> m_descriptorSetsNeedUpdate;
+
+		std::array<DeviceBuffer, 2> m_particleBuffers;
+		VkDescriptorSetLayout m_particleComputeDescriptorSetLayout;
+		VkDescriptorPool m_particleComputeDescriptorPool;
+		std::array<VkDescriptorSet, 2> m_particleComputeDescriptorSets;
+		VkPipeline m_particleComputePipeline;
+		VkPipelineLayout m_particleComputePipelineLayout;
+		VkDescriptorSetLayout m_particleGraphicsDescriptorSetLayout;
+		VkDescriptorPool m_particleGraphicsDescriptorPool;
+		std::vector<VkDescriptorSet> m_particleGraphicsDescriptorSets;
+		VkPipeline m_particleGraphicsPipeline;
+		VkPipelineLayout m_particleGraphicsPipelineLayout;
+		uint32_t m_inParticleCurrentIndex = 0;
+		uint32_t m_particlesNumber = 100000;
 
 		VkSampler m_toneMappingSampler;
 		VkDescriptorSetLayout m_toneMappingDescriptorSetLayout;
