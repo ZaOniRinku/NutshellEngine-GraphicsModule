@@ -976,28 +976,83 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	undefinedToAttachmentDependencyInfo.pImageMemoryBarriers = imageMemoryBarriers.data();
 	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &undefinedToAttachmentDependencyInfo);
 
-	// Synchronize draw particles and particle compute 
-	VkBufferMemoryBarrier2 drawToParticleComputeBufferBarrier = {};
-	drawToParticleComputeBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-	drawToParticleComputeBufferBarrier.pNext = nullptr;
-	drawToParticleComputeBufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-	drawToParticleComputeBufferBarrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
-	drawToParticleComputeBufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-	drawToParticleComputeBufferBarrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
-	drawToParticleComputeBufferBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
-	drawToParticleComputeBufferBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
-	drawToParticleComputeBufferBarrier.buffer = m_particleBuffers[m_inParticleCurrentIndex].handle; 
-	drawToParticleComputeBufferBarrier.offset = 0;
-	drawToParticleComputeBufferBarrier.size = 8388608;
+	// Update particle buffer
+	if (m_particleBuffersNeedUpdate[m_currentFrameInFlight]) {
+		// Copy particles staging buffer
+		VkBufferCopy particleStagingBufferCopy = {};
+		particleStagingBufferCopy.srcOffset = 0;
+		particleStagingBufferCopy.dstOffset = 0;
+		particleStagingBufferCopy.size = particles.size() * sizeof(Particle);
+		vkCmdCopyBuffer(m_renderingCommandBuffers[m_currentFrameInFlight], particleStagingBuffer, m_particleBuffers[0].handle, 1, &particleStagingBufferCopy);
 
+		m_particleBuffersNeedUpdate[m_currentFrameInFlight] = false;
+	}
+
+	// Synchronize before fill particle draw indirect buffer
+	VkBufferMemoryBarrier2 beforeFillParticleDrawIndirectBufferMemoryBarrier = {};
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.pNext = nullptr;
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.srcAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.buffer = m_particleDrawIndirectBuffer.handle;
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.offset = 0;
+	beforeFillParticleDrawIndirectBufferMemoryBarrier.size = sizeof(uint32_t);
+
+	VkDependencyInfo beforeFillParticleDrawIndirectBufferDependencyInfo = {};
+	beforeFillParticleDrawIndirectBufferDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	beforeFillParticleDrawIndirectBufferDependencyInfo.pNext = nullptr;
+	beforeFillParticleDrawIndirectBufferDependencyInfo.dependencyFlags = 0;
+	beforeFillParticleDrawIndirectBufferDependencyInfo.memoryBarrierCount = 0;
+	beforeFillParticleDrawIndirectBufferDependencyInfo.pMemoryBarriers = nullptr;
+	beforeFillParticleDrawIndirectBufferDependencyInfo.bufferMemoryBarrierCount = 1;
+	beforeFillParticleDrawIndirectBufferDependencyInfo.pBufferMemoryBarriers = &beforeFillParticleDrawIndirectBufferMemoryBarrier;
+	beforeFillParticleDrawIndirectBufferDependencyInfo.imageMemoryBarrierCount = 0;
+	beforeFillParticleDrawIndirectBufferDependencyInfo.pImageMemoryBarriers = nullptr;
+	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &beforeFillParticleDrawIndirectBufferDependencyInfo);
+
+	// Fill draw indirect particle buffer
+	vkCmdFillBuffer(m_renderingCommandBuffers[m_currentFrameInFlight], m_particleDrawIndirectBuffer.handle, 0, sizeof(uint32_t), 0);
+
+	// Synchronize before particle compute
+	VkBufferMemoryBarrier2 beforeDispatchParticleDrawIndirectBufferMemoryBarrier = {};
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.pNext = nullptr;
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.buffer = m_particleDrawIndirectBuffer.handle;
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.offset = 0;
+	beforeDispatchParticleDrawIndirectBufferMemoryBarrier.size = sizeof(uint32_t);
+
+	VkBufferMemoryBarrier2 drawToParticleComputeBufferMemoryBarrier = {};
+	drawToParticleComputeBufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+	drawToParticleComputeBufferMemoryBarrier.pNext = nullptr;
+	drawToParticleComputeBufferMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+	drawToParticleComputeBufferMemoryBarrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+	drawToParticleComputeBufferMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+	drawToParticleComputeBufferMemoryBarrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+	drawToParticleComputeBufferMemoryBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	drawToParticleComputeBufferMemoryBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	drawToParticleComputeBufferMemoryBarrier.buffer = m_particleBuffers[m_inParticleBufferCurrentIndex].handle; 
+	drawToParticleComputeBufferMemoryBarrier.offset = 0;
+	drawToParticleComputeBufferMemoryBarrier.size = 8388608;
+
+	std::array<VkBufferMemoryBarrier2, 2> drawToParticleComputeBufferMemoryBarriers = { beforeDispatchParticleDrawIndirectBufferMemoryBarrier, drawToParticleComputeBufferMemoryBarrier };
 	VkDependencyInfo drawToParticleComputeBufferDependencyInfo = {};
 	drawToParticleComputeBufferDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	drawToParticleComputeBufferDependencyInfo.pNext = nullptr;
 	drawToParticleComputeBufferDependencyInfo.dependencyFlags = 0;
 	drawToParticleComputeBufferDependencyInfo.memoryBarrierCount = 0;
 	drawToParticleComputeBufferDependencyInfo.pMemoryBarriers = nullptr;
-	drawToParticleComputeBufferDependencyInfo.bufferMemoryBarrierCount = 1;
-	drawToParticleComputeBufferDependencyInfo.pBufferMemoryBarriers = &drawToParticleComputeBufferBarrier;
+	drawToParticleComputeBufferDependencyInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(drawToParticleComputeBufferMemoryBarriers.size());
+	drawToParticleComputeBufferDependencyInfo.pBufferMemoryBarriers = drawToParticleComputeBufferMemoryBarriers.data();
 	drawToParticleComputeBufferDependencyInfo.imageMemoryBarrierCount = 0;
 	drawToParticleComputeBufferDependencyInfo.pImageMemoryBarriers = nullptr;
 	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &drawToParticleComputeBufferDependencyInfo);
@@ -1005,35 +1060,49 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	// Dispatch particles
 	vkCmdBindPipeline(m_renderingCommandBuffers[m_currentFrameInFlight], VK_PIPELINE_BIND_POINT_COMPUTE, m_particleComputePipeline);
 
-	vkCmdBindDescriptorSets(m_renderingCommandBuffers[m_currentFrameInFlight], VK_PIPELINE_BIND_POINT_COMPUTE, m_particleComputePipelineLayout, 0, 1, &m_particleComputeDescriptorSets[m_inParticleCurrentIndex], 0, nullptr);
+	vkCmdBindDescriptorSets(m_renderingCommandBuffers[m_currentFrameInFlight], VK_PIPELINE_BIND_POINT_COMPUTE, m_particleComputePipelineLayout, 0, 1, &m_particleComputeDescriptorSets[m_inParticleBufferCurrentIndex], 0, nullptr);
 
 	float deltaTimeFloat = static_cast<float>(dt);
 	vkCmdPushConstants(m_renderingCommandBuffers[m_currentFrameInFlight], m_particleComputePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(float), &deltaTimeFloat);
 
 	vkCmdDispatch(m_renderingCommandBuffers[m_currentFrameInFlight], ((m_particlesNumber + 64 - 1) / 64), 1, 1);
 
-	// Synchronize particle compute and draw particles
-	VkBufferMemoryBarrier2 particleComputeToDrawBufferBarrier = {};
-	particleComputeToDrawBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-	particleComputeToDrawBufferBarrier.pNext = nullptr;
-	particleComputeToDrawBufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-	particleComputeToDrawBufferBarrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
-	particleComputeToDrawBufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-	particleComputeToDrawBufferBarrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
-	particleComputeToDrawBufferBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
-	particleComputeToDrawBufferBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
-	particleComputeToDrawBufferBarrier.buffer = m_particleBuffers[(m_inParticleCurrentIndex + 1) % 2].handle;
-	particleComputeToDrawBufferBarrier.offset = 0;
-	particleComputeToDrawBufferBarrier.size = 8388608;
+	// Synchronize before particle draw
+	VkBufferMemoryBarrier2 beforeDrawIndirectBufferMemoryBarrier = {};
+	beforeDrawIndirectBufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+	beforeDrawIndirectBufferMemoryBarrier.pNext = nullptr;
+	beforeDrawIndirectBufferMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+	beforeDrawIndirectBufferMemoryBarrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+	beforeDrawIndirectBufferMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+	beforeDrawIndirectBufferMemoryBarrier.dstAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+	beforeDrawIndirectBufferMemoryBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	beforeDrawIndirectBufferMemoryBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	beforeDrawIndirectBufferMemoryBarrier.buffer = m_particleDrawIndirectBuffer.handle;
+	beforeDrawIndirectBufferMemoryBarrier.offset = 0;
+	beforeDrawIndirectBufferMemoryBarrier.size = sizeof(uint32_t);
 
+	VkBufferMemoryBarrier2 particleComputeToDrawBufferMemoryBarrier = {};
+	particleComputeToDrawBufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+	particleComputeToDrawBufferMemoryBarrier.pNext = nullptr;
+	particleComputeToDrawBufferMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+	particleComputeToDrawBufferMemoryBarrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+	particleComputeToDrawBufferMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+	particleComputeToDrawBufferMemoryBarrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+	particleComputeToDrawBufferMemoryBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	particleComputeToDrawBufferMemoryBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	particleComputeToDrawBufferMemoryBarrier.buffer = m_particleBuffers[(m_inParticleBufferCurrentIndex + 1) % 2].handle;
+	particleComputeToDrawBufferMemoryBarrier.offset = 0;
+	particleComputeToDrawBufferMemoryBarrier.size = 8388608;
+
+	std::array<VkBufferMemoryBarrier2, 2> particleComputeToDrawBufferMemoryBarriers = { beforeDrawIndirectBufferMemoryBarrier, particleComputeToDrawBufferMemoryBarrier };
 	VkDependencyInfo particleComputeToDrawDependencyInfo = {};
 	particleComputeToDrawDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	particleComputeToDrawDependencyInfo.pNext = nullptr;
 	particleComputeToDrawDependencyInfo.dependencyFlags = 0;
 	particleComputeToDrawDependencyInfo.memoryBarrierCount = 0;
 	particleComputeToDrawDependencyInfo.pMemoryBarriers = nullptr;
-	particleComputeToDrawDependencyInfo.bufferMemoryBarrierCount = 1;
-	particleComputeToDrawDependencyInfo.pBufferMemoryBarriers = &particleComputeToDrawBufferBarrier;
+	particleComputeToDrawDependencyInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(particleComputeToDrawBufferMemoryBarriers.size());
+	particleComputeToDrawDependencyInfo.pBufferMemoryBarriers = particleComputeToDrawBufferMemoryBarriers.data();
 	particleComputeToDrawDependencyInfo.imageMemoryBarrierCount = 0;
 	particleComputeToDrawDependencyInfo.pImageMemoryBarriers = nullptr;
 	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &particleComputeToDrawDependencyInfo);
@@ -1142,11 +1211,11 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	vkCmdSetViewport(m_renderingCommandBuffers[m_currentFrameInFlight], 0, 1, &m_viewport);
 	vkCmdSetScissor(m_renderingCommandBuffers[m_currentFrameInFlight], 0, 1, &m_scissor);
 
-	vkCmdBindVertexBuffers(m_renderingCommandBuffers[m_currentFrameInFlight], 0, 1, &m_particleBuffers[(m_inParticleCurrentIndex + 1) % 2].handle, &vertexBufferOffset);
+	vkCmdBindVertexBuffers(m_renderingCommandBuffers[m_currentFrameInFlight], 0, 1, &m_particleBuffers[(m_inParticleBufferCurrentIndex + 1) % 2].handle, &vertexBufferOffset);
 
 	vkCmdBindDescriptorSets(m_renderingCommandBuffers[m_currentFrameInFlight], VK_PIPELINE_BIND_POINT_GRAPHICS, m_particleGraphicsPipelineLayout, 0, 1, &m_particleGraphicsDescriptorSets[m_currentFrameInFlight], 0, nullptr);
 
-	vkCmdDraw(m_renderingCommandBuffers[m_currentFrameInFlight], m_particlesNumber, 1, 0, 0);
+	vkCmdDrawIndirect(m_renderingCommandBuffers[m_currentFrameInFlight], m_particleDrawIndirectBuffer.handle, 0, 1, 0);
 
 	m_vkCmdEndRenderingKHR(m_renderingCommandBuffers[m_currentFrameInFlight]);
 
@@ -1403,7 +1472,7 @@ void NtshEngn::GraphicsModule::update(double dt) {
 		NTSHENGN_VK_CHECK(vkQueueSubmit(m_graphicsComputeQueue, 1, &emptyWaitSubmitInfo, VK_NULL_HANDLE));
 	}
 
-	m_inParticleCurrentIndex = (m_inParticleCurrentIndex + 1) % 2;
+	m_inParticleBufferCurrentIndex = (m_inParticleBufferCurrentIndex + 1) % 2;
 
 	m_uiTextBufferOffset = 0;
 
@@ -1497,6 +1566,10 @@ void NtshEngn::GraphicsModule::destroy() {
 	vkDestroyPipeline(m_device, m_particleComputePipeline, nullptr);
 	vkDestroyPipelineLayout(m_device, m_particleComputePipelineLayout, nullptr);
 	vkDestroyDescriptorSetLayout(m_device, m_particleComputeDescriptorSetLayout, nullptr);
+	vmaDestroyBuffer(m_allocator, m_particleDrawIndirectBuffer.handle, m_particleDrawIndirectBuffer.allocation);
+	for (size_t i = 0; i < m_framesInFlight; i++) {
+		vmaDestroyBuffer(m_allocator, m_particleStagingBuffers[i].handle, m_particleStagingBuffers[i].allocation);
+	}
 	for (size_t i = 0; i < m_particleBuffers.size(); i++) {
 		vmaDestroyBuffer(m_allocator, m_particleBuffers[i].handle, m_particleBuffers[i].allocation);
 	}
@@ -2321,6 +2394,36 @@ bool NtshEngn::GraphicsModule::isAnimationPlaying(Entity entity, uint32_t animat
 	}
 
 	return false;
+}
+
+void NtshEngn::GraphicsModule::emitParticles(const ParticleEmitter& particleEmitter) {
+	std::default_random_engine randomEngine((uint32_t)time(NULL));
+	std::uniform_real_distribution<float> randomDistribution(0.0f, 1.0f);
+
+	std::vector<Particle> particles(particleEmitter.number);
+	for (Particle& particle : particles) {
+		particle.position = Math::vec4(particleEmitter.positionMin.x + ((particleEmitter.positionMax.x - particleEmitter.positionMin.x) * randomDistribution(randomEngine)),
+			particleEmitter.positionMin.y + ((particleEmitter.positionMax.y - particleEmitter.positionMin.y) * randomDistribution(randomEngine)),
+			particleEmitter.positionMin.z + ((particleEmitter.positionMax.z - particleEmitter.positionMin.z) * randomDistribution(randomEngine)),
+			0.0f);
+		particle.color = Math::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+		Math::vec3 rotation = Math::vec3(particleEmitter.rotationMin.x + ((particleEmitter.rotationMax.x - particleEmitter.rotationMin.x) * randomDistribution(randomEngine)),
+			particleEmitter.rotationMin.y + ((particleEmitter.rotationMax.y - particleEmitter.rotationMin.y) * randomDistribution(randomEngine)),
+			particleEmitter.rotationMin.z + ((particleEmitter.rotationMax.z - particleEmitter.rotationMin.z) * randomDistribution(randomEngine)));
+		const Math::vec3 baseDirection = Math::normalize(particleEmitter.direction);
+		const float baseDirectionYaw = std::atan2(baseDirection.z, baseDirection.x);
+		const float baseDirectionPitch = -std::asin(baseDirection.y);
+		particle.direction = Math::normalize(Math::vec3(
+			std::cos(baseDirectionPitch + rotation.x) * std::cos(baseDirectionYaw + rotation.y),
+			-std::sin(baseDirectionPitch + rotation.x),
+			std::cos(baseDirectionPitch + rotation.x) * std::sin(baseDirectionYaw + rotation.y)
+		));
+		particle.duration = particleEmitter.durationMin + ((particleEmitter.durationMax - particleEmitter.durationMin) * randomDistribution(randomEngine));
+	}
+
+	memcpy(m_particleStagingBuffers[m_currentFrameInFlight].address, particles.data(), particles.size() * sizeof(Particle));
+
+	m_particleBuffersNeedUpdate[m_currentFrameInFlight] = true;
 }
 
 void NtshEngn::GraphicsModule::drawUIText(FontID fontID, const std::string& text, const Math::vec2& position, const Math::vec4& color) {
@@ -3808,7 +3911,7 @@ void NtshEngn::GraphicsModule::updateDescriptorSet(uint32_t frameInFlight) {
 }
 
 void NtshEngn::GraphicsModule::createParticleResources() {
-	// Create buffers
+	// Create particle buffer
 	VkBufferCreateInfo particleBufferCreateInfo = {};
 	particleBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	particleBufferCreateInfo.pNext = nullptr;
@@ -3828,26 +3931,8 @@ void NtshEngn::GraphicsModule::createParticleResources() {
 	NTSHENGN_VK_CHECK(vmaCreateBuffer(m_allocator, &particleBufferCreateInfo, &particleBufferAllocationCreateInfo, &m_particleBuffers[0].handle, &m_particleBuffers[0].allocation, &particleBufferAllocationInfo));
 	NTSHENGN_VK_CHECK(vmaCreateBuffer(m_allocator, &particleBufferCreateInfo, &particleBufferAllocationCreateInfo, &m_particleBuffers[1].handle, &m_particleBuffers[1].allocation, &particleBufferAllocationInfo));
 
-	// Create initial particles
-	std::default_random_engine randomEngine((uint32_t)time(NULL));
-	std::uniform_real_distribution<float> randomDistribution(0.0f, 1.0f);
-
-	std::vector<Particle> particles(m_particlesNumber);
-	for (Particle& particle : particles) {
-		float r = 0.25f * std::sqrt(randomDistribution(randomEngine));
-		float theta = randomDistribution(randomEngine) * 2.0f * Math::PI;
-		float x = r * std::cos(theta) * (m_viewport.height / m_viewport.width);
-		float y = r * std::sin(theta);
-		float z = randomDistribution(randomEngine);
-
-		particle.position = Math::vec4(x, y, z, 0.0f);
-		particle.color = Math::vec4(randomDistribution(randomEngine), randomDistribution(randomEngine), randomDistribution(randomEngine), randomDistribution(randomEngine));
-		particle.velocity = Math::normalize(particle.position) * 0.00025f;
-	}
-
-	VkBuffer particleStagingBuffer;
-	VmaAllocation particleStagingBufferAllocation;
-
+	// Create staging buffers
+	m_particleStagingBuffers.resize(m_framesInFlight);
 	VkBufferCreateInfo particleStagingBufferCreateInfo = {};
 	particleStagingBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	particleStagingBufferCreateInfo.pNext = nullptr;
@@ -3861,49 +3946,66 @@ void NtshEngn::GraphicsModule::createParticleResources() {
 	VmaAllocationInfo particleStagingBufferAllocationInfo;
 
 	VmaAllocationCreateInfo particleStagingBufferAllocationCreateInfo = {};
-	particleStagingBufferAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+	particleStagingBufferAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 	particleStagingBufferAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
-	NTSHENGN_VK_CHECK(vmaCreateBuffer(m_allocator, &particleStagingBufferCreateInfo, &particleStagingBufferAllocationCreateInfo, &particleStagingBuffer, &particleStagingBufferAllocation, &particleStagingBufferAllocationInfo));
 
-	void* data;
+	for (uint32_t i = 0; i < m_framesInFlight; i++) {
+		NTSHENGN_VK_CHECK(vmaCreateBuffer(m_allocator, &particleStagingBufferCreateInfo, &particleStagingBufferAllocationCreateInfo, &m_particleStagingBuffers[i].handle, &m_particleStagingBuffers[i].allocation, &particleStagingBufferAllocationInfo));
+		m_particleStagingBuffers[i].address = particleStagingBufferAllocationInfo.pMappedData;
+	}
 
-	NTSHENGN_VK_CHECK(vmaMapMemory(m_allocator, particleStagingBufferAllocation, &data));
-	memcpy(data, particles.data(), particles.size() * sizeof(Particle));
-	vmaUnmapMemory(m_allocator, particleStagingBufferAllocation);
+	m_particleBuffersNeedUpdate.resize(m_framesInFlight);
+	for (uint32_t i = 0; i < m_framesInFlight; i++) {
+		m_particleBuffersNeedUpdate[i] = false;
+	}
 
-	// Copy staging buffer
+	// Create draw indirect buffer
+	VkBufferCreateInfo particleDrawIndirectBufferCreateInfo = {};
+	particleDrawIndirectBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	particleDrawIndirectBufferCreateInfo.pNext = nullptr;
+	particleDrawIndirectBufferCreateInfo.flags = 0;
+	particleDrawIndirectBufferCreateInfo.size = 4 * sizeof(uint32_t);
+	particleDrawIndirectBufferCreateInfo.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	particleDrawIndirectBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	particleDrawIndirectBufferCreateInfo.queueFamilyIndexCount = 1;
+	particleDrawIndirectBufferCreateInfo.pQueueFamilyIndices = &m_graphicsComputeQueueFamilyIndex;
+
+	VmaAllocationInfo particleDrawIndirectBufferAllocationInfo;
+
+	VmaAllocationCreateInfo particleDrawIndirectBufferAllocationCreateInfo = {};
+	particleDrawIndirectBufferAllocationCreateInfo.flags = 0;
+	particleDrawIndirectBufferAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+	NTSHENGN_VK_CHECK(vmaCreateBuffer(m_allocator, &particleDrawIndirectBufferCreateInfo, &particleDrawIndirectBufferAllocationCreateInfo, &m_particleDrawIndirectBuffer.handle, &m_particleDrawIndirectBuffer.allocation, &particleDrawIndirectBufferAllocationInfo));
+
+	// Fill draw indirect buffer
 	NTSHENGN_VK_CHECK(vkResetCommandPool(m_device, m_initializationCommandPool, 0));
 
-	VkCommandBufferBeginInfo stagingBuffersCopyBeginInfo = {};
-	stagingBuffersCopyBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	stagingBuffersCopyBeginInfo.pNext = nullptr;
-	stagingBuffersCopyBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	stagingBuffersCopyBeginInfo.pInheritanceInfo = nullptr;
-	NTSHENGN_VK_CHECK(vkBeginCommandBuffer(m_initializationCommandBuffer, &stagingBuffersCopyBeginInfo));
+	VkCommandBufferBeginInfo fillDrawIndirectBufferBeginInfo = {};
+	fillDrawIndirectBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	fillDrawIndirectBufferBeginInfo.pNext = nullptr;
+	fillDrawIndirectBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	fillDrawIndirectBufferBeginInfo.pInheritanceInfo = nullptr;
+	NTSHENGN_VK_CHECK(vkBeginCommandBuffer(m_initializationCommandBuffer, &fillDrawIndirectBufferBeginInfo));
 
-	VkBufferCopy stagingBufferCopy = {};
-	stagingBufferCopy.srcOffset = 0;
-	stagingBufferCopy.dstOffset = 0;
-	stagingBufferCopy.size = particles.size() * sizeof(Particle);
-	vkCmdCopyBuffer(m_initializationCommandBuffer, particleStagingBuffer, m_particleBuffers[0].handle, 1, &stagingBufferCopy);
+	std::vector<uint32_t> drawIndirectData = { 1, 0, 0 };
+	vkCmdUpdateBuffer(m_initializationCommandBuffer, m_particleDrawIndirectBuffer.handle, sizeof(uint32_t), 3 * sizeof(uint32_t), drawIndirectData.data());
 
 	NTSHENGN_VK_CHECK(vkEndCommandBuffer(m_initializationCommandBuffer));
 
-	VkSubmitInfo bufferCopySubmitInfo = {};
-	bufferCopySubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	bufferCopySubmitInfo.pNext = nullptr;
-	bufferCopySubmitInfo.waitSemaphoreCount = 0;
-	bufferCopySubmitInfo.pWaitSemaphores = nullptr;
-	bufferCopySubmitInfo.pWaitDstStageMask = nullptr;
-	bufferCopySubmitInfo.commandBufferCount = 1;
-	bufferCopySubmitInfo.pCommandBuffers = &m_initializationCommandBuffer;
-	bufferCopySubmitInfo.signalSemaphoreCount = 0;
-	bufferCopySubmitInfo.pSignalSemaphores = nullptr;
-	NTSHENGN_VK_CHECK(vkQueueSubmit(m_graphicsComputeQueue, 1, &bufferCopySubmitInfo, m_initializationFence));
+	VkSubmitInfo fillDrawIndirectBufferSubmitInfo = {};
+	fillDrawIndirectBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	fillDrawIndirectBufferSubmitInfo.pNext = nullptr;
+	fillDrawIndirectBufferSubmitInfo.waitSemaphoreCount = 0;
+	fillDrawIndirectBufferSubmitInfo.pWaitSemaphores = nullptr;
+	fillDrawIndirectBufferSubmitInfo.pWaitDstStageMask = nullptr;
+	fillDrawIndirectBufferSubmitInfo.commandBufferCount = 1;
+	fillDrawIndirectBufferSubmitInfo.pCommandBuffers = &m_initializationCommandBuffer;
+	fillDrawIndirectBufferSubmitInfo.signalSemaphoreCount = 0;
+	fillDrawIndirectBufferSubmitInfo.pSignalSemaphores = nullptr;
+	NTSHENGN_VK_CHECK(vkQueueSubmit(m_graphicsComputeQueue, 1, &fillDrawIndirectBufferSubmitInfo, m_initializationFence));
 	NTSHENGN_VK_CHECK(vkWaitForFences(m_device, 1, &m_initializationFence, VK_TRUE, std::numeric_limits<uint64_t>::max()));
 	NTSHENGN_VK_CHECK(vkResetFences(m_device, 1, &m_initializationFence));
-
-	vmaDestroyBuffer(m_allocator, particleStagingBuffer, particleStagingBufferAllocation);
 
 	// Create descriptor set layouts
 	VkDescriptorSetLayoutBinding inParticleBufferDescriptorSetLayoutBinding = {};
@@ -3953,7 +4055,8 @@ void NtshEngn::GraphicsModule::createParticleResources() {
 		struct Particle {
 			vec3 position;
 			vec4 color;
-			vec3 velocity;
+			vec3 direction;
+			float duration;
 		};
 
 		layout(set = 0, binding = 0) restrict readonly buffer InParticles {
@@ -3964,6 +4067,13 @@ void NtshEngn::GraphicsModule::createParticleResources() {
 			Particle particles[];
 		} outParticles;
 
+		layout(set = 0, binding = 2) buffer OutDrawIndirect {
+			uint vertexCount;
+			uint instanceCount;
+			uint firstVertex;
+			uint firstInstance;
+		} outDrawIndirect;
+
 		layout(push_constant) uniform DeltaTime {
 			float deltaTime;
 		} dT;
@@ -3973,9 +4083,15 @@ void NtshEngn::GraphicsModule::createParticleResources() {
 
 			Particle inParticle = inParticles.particles[index];
 
-			outParticles.particles[index].position = inParticle.position + inParticle.velocity * dT.deltaTime;
-			outParticles.particles[index].color = inParticle.color;
-			outParticles.particles[index].velocity = inParticle.velocity;
+			float newDuration = inParticle.duration - dT.deltaTime;
+			if (newDuration >= 0.0) {
+				uint particleIndex = atomicAdd(outDrawIndirect.vertexCount, 1);
+
+				outParticles.particles[particleIndex].position = inParticle.position + inParticle.direction * dT.deltaTime;
+				outParticles.particles[particleIndex].color = inParticle.color;
+				outParticles.particles[particleIndex].direction = inParticle.direction;
+				outParticles.particles[particleIndex].duration = newLifetime;
+			}
 		}
 	)GLSL";
 	const std::vector<uint32_t> computeShaderSpv = compileShader(computeShaderCode, ShaderType::Compute);

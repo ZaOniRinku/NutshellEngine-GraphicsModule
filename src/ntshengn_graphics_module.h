@@ -198,7 +198,8 @@ struct InternalUIImage {
 struct Particle {
 	NtshEngn::Math::vec4 position = { 0.0f, 0.0f, 0.0f, 0.0f };
 	NtshEngn::Math::vec4 color = { 0.0f, 0.0f, 0.0f, 0.0f };
-	NtshEngn::Math::vec4 velocity = { 0.0f, 0.0f, 0.0f, 0.0f };
+	NtshEngn::Math::vec3 direction = { 0.0f, 0.0f, 0.0f };
+	float duration = 0.0f;
 };
 
 namespace NtshEngn {
@@ -230,6 +231,9 @@ namespace NtshEngn {
 
 		// Returns true if the entity is currently playing the animation with index animationIndex, else, returns false
 		bool isAnimationPlaying(Entity entity, uint32_t animationIndex);
+
+		// Emits particles described by particleEmitter
+		void emitParticles(const ParticleEmitter& particleEmitter);
 
 		// Draws a text on the UI with the font in the fontID parameter using the position on screen and color
 		void drawUIText(FontID fontID, const std::string& text, const Math::vec2& position, const Math::vec4& color);
@@ -372,6 +376,9 @@ namespace NtshEngn {
 		std::vector<bool> m_descriptorSetsNeedUpdate;
 
 		std::array<DeviceBuffer, 2> m_particleBuffers;
+		std::vector<HostVisibleBuffer> m_particleStagingBuffers;
+		DeviceBuffer m_particleDrawIndirectBuffer;
+		std::vector<bool> m_particleBuffersNeedUpdate;
 		VkDescriptorSetLayout m_particleComputeDescriptorSetLayout;
 		VkDescriptorPool m_particleComputeDescriptorPool;
 		std::array<VkDescriptorSet, 2> m_particleComputeDescriptorSets;
@@ -382,8 +389,8 @@ namespace NtshEngn {
 		std::vector<VkDescriptorSet> m_particleGraphicsDescriptorSets;
 		VkPipeline m_particleGraphicsPipeline;
 		VkPipelineLayout m_particleGraphicsPipelineLayout;
-		uint32_t m_inParticleCurrentIndex = 0;
-		uint32_t m_particlesNumber = 100000;
+		uint32_t m_inParticleBufferCurrentIndex = 0;
+		uint32_t m_particlesNumber = 0;
 
 		VkSampler m_toneMappingSampler;
 		VkDescriptorSetLayout m_toneMappingDescriptorSetLayout;
