@@ -18,11 +18,13 @@
 #endif
 #include <string>
 #include <vector>
+#include <forward_list>
 #include <limits>
 #include <unordered_map>
 #include <set>
 #include <queue>
 #include <utility>
+#include <tuple>
 
 #define NTSHENGN_VK_CHECK(f) \
 	do { \
@@ -196,10 +198,13 @@ struct InternalUIImage {
 };
 
 struct Particle {
-	NtshEngn::Math::vec4 position = { 0.0f, 0.0f, 0.0f, 0.0f };
+	NtshEngn::Math::vec3 position = { 0.0f, 0.0f, 0.0f };
+	float size = 0.0f;
 	NtshEngn::Math::vec4 color = { 0.0f, 0.0f, 0.0f, 0.0f };
 	NtshEngn::Math::vec3 direction = { 0.0f, 0.0f, 0.0f };
+	float speed = 0.0f;
 	float duration = 0.0f;
+	NtshEngn::Math::vec3 padding = { 0.0f, 0.0f, 0.0f };
 };
 
 namespace NtshEngn {
@@ -390,7 +395,8 @@ namespace NtshEngn {
 		VkPipeline m_particleGraphicsPipeline;
 		VkPipelineLayout m_particleGraphicsPipelineLayout;
 		uint32_t m_inParticleBufferCurrentIndex = 0;
-		uint32_t m_particlesNumber = 0;
+		uint32_t m_maxParticlesNumber = 100000;
+		size_t m_currentParticleHostSize = 0;
 
 		VkSampler m_toneMappingSampler;
 		VkDescriptorSetLayout m_toneMappingDescriptorSetLayout;
