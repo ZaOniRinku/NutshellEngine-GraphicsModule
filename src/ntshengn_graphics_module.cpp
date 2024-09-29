@@ -2496,18 +2496,18 @@ void NtshEngn::GraphicsModule::emitParticles(const ParticleEmitter& particleEmit
 
 	std::vector<Particle> particles(particleEmitter.number);
 	for (Particle& particle : particles) {
-		particle.position = Math::vec3(Math::lerp(particleEmitter.positionMin.x, particleEmitter.positionMax.x, randomDistribution(randomEngine)),
-			Math::lerp(particleEmitter.positionMin.y, particleEmitter.positionMax.y, randomDistribution(randomEngine)),
-			Math::lerp(particleEmitter.positionMin.z, particleEmitter.positionMax.z, randomDistribution(randomEngine)));
-		particle.size = Math::lerp(particleEmitter.sizeMin, particleEmitter.sizeMax, randomDistribution(randomEngine));
-		particle.color = Math::vec4(Math::lerp(particleEmitter.colorMin.x, particleEmitter.colorMax.x, randomDistribution(randomEngine)),
-			Math::lerp(particleEmitter.colorMin.y, particleEmitter.colorMax.y, randomDistribution(randomEngine)),
-			Math::lerp(particleEmitter.colorMin.z, particleEmitter.colorMax.y, randomDistribution(randomEngine)),
-			Math::lerp(particleEmitter.colorMin.w, particleEmitter.colorMax.w, randomDistribution(randomEngine)));
-		Math::vec3 rotation = Math::vec3(Math::lerp(particleEmitter.rotationMin.x, particleEmitter.rotationMax.x, randomDistribution(randomEngine)),
-			Math::lerp(particleEmitter.rotationMin.y, particleEmitter.rotationMax.y, randomDistribution(randomEngine)),
-			Math::lerp(particleEmitter.rotationMin.z, particleEmitter.rotationMax.z, randomDistribution(randomEngine)));
-		const Math::vec3 baseDirection = Math::normalize(particleEmitter.direction);
+		particle.position = Math::vec3(Math::lerp(particleEmitter.positionRange[0].x, particleEmitter.positionRange[1].x, randomDistribution(randomEngine)),
+			Math::lerp(particleEmitter.positionRange[0].y, particleEmitter.positionRange[1].y, randomDistribution(randomEngine)),
+			Math::lerp(particleEmitter.positionRange[0].z, particleEmitter.positionRange[1].z, randomDistribution(randomEngine)));
+		particle.size = Math::lerp(particleEmitter.sizeRange[0], particleEmitter.sizeRange[1], randomDistribution(randomEngine));
+		particle.color = Math::vec4(Math::lerp(particleEmitter.colorRange[0].x, particleEmitter.colorRange[1].x, randomDistribution(randomEngine)),
+			Math::lerp(particleEmitter.colorRange[0].y, particleEmitter.colorRange[1].y, randomDistribution(randomEngine)),
+			Math::lerp(particleEmitter.colorRange[0].z, particleEmitter.colorRange[1].y, randomDistribution(randomEngine)),
+			Math::lerp(particleEmitter.colorRange[0].w, particleEmitter.colorRange[1].w, randomDistribution(randomEngine)));
+		Math::vec3 rotation = Math::vec3(Math::lerp(particleEmitter.rotationRange[0].x, particleEmitter.rotationRange[1].x, randomDistribution(randomEngine)),
+			Math::lerp(particleEmitter.rotationRange[0].y, particleEmitter.rotationRange[1].y, randomDistribution(randomEngine)),
+			Math::lerp(particleEmitter.rotationRange[0].z, particleEmitter.rotationRange[1].z, randomDistribution(randomEngine)));
+		const Math::vec3 baseDirection = Math::normalize(particleEmitter.baseDirection);
 		const float baseDirectionYaw = std::atan2(baseDirection.z, baseDirection.x);
 		const float baseDirectionPitch = -std::asin(baseDirection.y);
 		particle.direction = Math::normalize(Math::vec3(
@@ -2515,8 +2515,8 @@ void NtshEngn::GraphicsModule::emitParticles(const ParticleEmitter& particleEmit
 			-std::sin(baseDirectionPitch + rotation.x),
 			std::cos(baseDirectionPitch + rotation.x) * std::sin(baseDirectionYaw + rotation.y)
 		));
-		particle.speed = Math::lerp(particleEmitter.speedMin, particleEmitter.speedMax, randomDistribution(randomEngine));
-		particle.duration = Math::lerp(particleEmitter.durationMin, particleEmitter.durationMax, randomDistribution(randomEngine));
+		particle.speed = Math::lerp(particleEmitter.speedRange[0], particleEmitter.speedRange[1], randomDistribution(randomEngine));
+		particle.duration = Math::lerp(particleEmitter.durationRange[0], particleEmitter.durationRange[1], randomDistribution(randomEngine));
 	}
 
 	size_t size = particles.size() * sizeof(Particle);
@@ -4267,7 +4267,6 @@ void NtshEngn::GraphicsModule::createParticleResources() {
 		layout(set = 0, binding = 0) uniform Camera {
 			mat4 view;
 			mat4 projection;
-			vec3 position;
 		} camera;
 
 		layout(location = 0) in vec3 position;
@@ -4639,7 +4638,7 @@ void NtshEngn::GraphicsModule::createParticleResources() {
 		VkDescriptorBufferInfo cameraDescriptorBufferInfo;
 		cameraDescriptorBufferInfo.buffer = m_cameraBuffers[i].handle;
 		cameraDescriptorBufferInfo.offset = 0;
-		cameraDescriptorBufferInfo.range = sizeof(Math::mat4) * 2 + sizeof(Math::vec4);
+		cameraDescriptorBufferInfo.range = sizeof(Math::mat4) * 2;
 
 		VkWriteDescriptorSet cameraDescriptorWriteDescriptorSet = {};
 		cameraDescriptorWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
