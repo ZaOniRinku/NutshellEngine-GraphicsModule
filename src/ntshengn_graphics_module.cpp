@@ -1258,6 +1258,56 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	// End rendering
 	m_vkCmdEndRenderingKHR(m_renderingCommandBuffers[m_currentFrameInFlight]);
 
+	// Synchronization before particles
+	VkImageMemoryBarrier2 colorAttachmentBeforeParticlesImageMemoryBarrier = {};
+	colorAttachmentBeforeParticlesImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.pNext = nullptr;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.image = m_colorImage;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.subresourceRange.levelCount = 1;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
+	colorAttachmentBeforeParticlesImageMemoryBarrier.subresourceRange.layerCount = 1;
+
+	VkImageMemoryBarrier2 depthAttachmentBeforeParticlesImageMemoryBarrier = {};
+	depthAttachmentBeforeParticlesImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.pNext = nullptr;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.image = m_depthImage;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.subresourceRange.levelCount = 1;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
+	depthAttachmentBeforeParticlesImageMemoryBarrier.subresourceRange.layerCount = 1;
+
+	std::array<VkImageMemoryBarrier2, 2> beforeParticlesImageMemoryBarriers = { colorAttachmentBeforeParticlesImageMemoryBarrier, depthAttachmentBeforeParticlesImageMemoryBarrier };
+	VkDependencyInfo beforeParticlesDependencyInfo = {};
+	beforeParticlesDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	beforeParticlesDependencyInfo.pNext = nullptr;
+	beforeParticlesDependencyInfo.dependencyFlags = 0;
+	beforeParticlesDependencyInfo.memoryBarrierCount = 0;
+	beforeParticlesDependencyInfo.pMemoryBarriers = nullptr;
+	beforeParticlesDependencyInfo.bufferMemoryBarrierCount = 0;
+	beforeParticlesDependencyInfo.pBufferMemoryBarriers = nullptr;
+	beforeParticlesDependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(beforeParticlesImageMemoryBarriers.size());
+	beforeParticlesDependencyInfo.pImageMemoryBarriers = beforeParticlesImageMemoryBarriers.data();
+	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &beforeParticlesDependencyInfo);
+
 	// Draw particles
 	VkRenderingAttachmentInfo particleRenderingColorAttachmentInfo = {};
 	particleRenderingColorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
