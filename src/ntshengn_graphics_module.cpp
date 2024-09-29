@@ -571,6 +571,21 @@ void NtshEngn::GraphicsModule::init() {
 
 	createCompositingResources();
 
+	m_particles.init(m_device,
+		m_graphicsComputeQueue,
+		m_graphicsComputeQueueFamilyIndex,
+		m_allocator,
+		m_drawImageFormat,
+		m_initializationCommandPool,
+		m_initializationCommandBuffer,
+		m_initializationFence,
+		m_viewport,
+		m_scissor,
+		m_framesInFlight,
+		m_vkCmdBeginRenderingKHR,
+		m_vkCmdEndRenderingKHR,
+		m_vkCmdPipelineBarrier2KHR);
+
 #if BLOOM_ENABLE == 1
 	m_bloom.init(m_device,
 		m_graphicsComputeQueue,
@@ -1147,42 +1162,42 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	// End compositing rendering
 	m_vkCmdEndRenderingKHR(m_renderingCommandBuffers[m_currentFrameInFlight]);
 
-	// Compositing layout transition VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-	VkImageMemoryBarrier2 compositingColorAttachmentToFragmentImageMemoryBarrier = {};
-	compositingColorAttachmentToFragmentImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.pNext = nullptr;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.image = m_compositingImage.handle;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.subresourceRange.baseMipLevel = 0;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.subresourceRange.levelCount = 1;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
-	compositingColorAttachmentToFragmentImageMemoryBarrier.subresourceRange.layerCount = 1;
+	// Compositing synchronization before particles
+	VkImageMemoryBarrier2 compositingBeforeParticlesImageMemoryBarrier = {};
+	compositingBeforeParticlesImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+	compositingBeforeParticlesImageMemoryBarrier.pNext = nullptr;
+	compositingBeforeParticlesImageMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+	compositingBeforeParticlesImageMemoryBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+	compositingBeforeParticlesImageMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+	compositingBeforeParticlesImageMemoryBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+	compositingBeforeParticlesImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	compositingBeforeParticlesImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	compositingBeforeParticlesImageMemoryBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	compositingBeforeParticlesImageMemoryBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	compositingBeforeParticlesImageMemoryBarrier.image = m_compositingImage.handle;
+	compositingBeforeParticlesImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	compositingBeforeParticlesImageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+	compositingBeforeParticlesImageMemoryBarrier.subresourceRange.levelCount = 1;
+	compositingBeforeParticlesImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
+	compositingBeforeParticlesImageMemoryBarrier.subresourceRange.layerCount = 1;
 
-	VkDependencyInfo compositingDependencyInfo = {};
-	compositingDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-	compositingDependencyInfo.pNext = nullptr;
-	compositingDependencyInfo.dependencyFlags = 0;
-	compositingDependencyInfo.memoryBarrierCount = 0;
-	compositingDependencyInfo.pMemoryBarriers = nullptr;
-	compositingDependencyInfo.bufferMemoryBarrierCount = 0;
-	compositingDependencyInfo.pBufferMemoryBarriers = nullptr;
-	compositingDependencyInfo.imageMemoryBarrierCount = 1;
-	compositingDependencyInfo.pImageMemoryBarriers = &compositingColorAttachmentToFragmentImageMemoryBarrier;
-	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &compositingDependencyInfo);
+	VkDependencyInfo compositingBeforeParticlesDependencyInfo = {};
+	compositingBeforeParticlesDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	compositingBeforeParticlesDependencyInfo.pNext = nullptr;
+	compositingBeforeParticlesDependencyInfo.dependencyFlags = 0;
+	compositingBeforeParticlesDependencyInfo.memoryBarrierCount = 0;
+	compositingBeforeParticlesDependencyInfo.pMemoryBarriers = nullptr;
+	compositingBeforeParticlesDependencyInfo.bufferMemoryBarrierCount = 0;
+	compositingBeforeParticlesDependencyInfo.pBufferMemoryBarriers = nullptr;
+	compositingBeforeParticlesDependencyInfo.imageMemoryBarrierCount = 1;
+	compositingBeforeParticlesDependencyInfo.pImageMemoryBarriers = &compositingBeforeParticlesImageMemoryBarrier;
+	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &compositingBeforeParticlesDependencyInfo);
+
+	m_particles.draw(m_renderingCommandBuffers[m_currentFrameInFlight], m_compositingImage.handle, m_compositingImage.view, m_gBuffer.getDepth().view);
 
 #if BLOOM_ENABLE == 1
 	// Bloom
 	m_bloom.draw(m_renderingCommandBuffers[m_currentFrameInFlight], m_compositingImage.handle, m_compositingImage.view);
-
-	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &compositingDependencyInfo);
 #endif
 
 	// Tone mapping
@@ -1511,6 +1526,9 @@ void NtshEngn::GraphicsModule::destroy() {
 	// Destroy bloom
 	m_bloom.destroy();
 #endif
+
+	// Destroy particles
+	m_particles.destroy();
 
 	// Destroy compositing resources
 	vkDestroyDescriptorPool(m_device, m_compositingDescriptorPool, nullptr);
@@ -2342,6 +2360,14 @@ bool NtshEngn::GraphicsModule::isAnimationPlaying(Entity entity, uint32_t animat
 	}
 
 	return false;
+}
+
+void NtshEngn::GraphicsModule::emitParticles(const ParticleEmitter& particleEmitter) {
+	if (particleEmitter.number == 0) {
+		return;
+	}
+
+	m_particles.emitParticles(particleEmitter, m_currentFrameInFlight);
 }
 
 void NtshEngn::GraphicsModule::drawUIText(FontID fontID, const std::string& text, const Math::vec2& position, const Math::vec4& color) {
