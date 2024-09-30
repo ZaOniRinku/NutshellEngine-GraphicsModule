@@ -376,6 +376,8 @@ void Particles::draw(VkCommandBuffer commandBuffer, VkImage drawImage, VkImageVi
 	vkCmdDrawIndirect(commandBuffer, m_drawIndirectBuffer.handle, 0, 1, 0);
 
 	m_vkCmdEndRenderingKHR(commandBuffer);
+
+	m_inParticleBufferCurrentIndex = (m_inParticleBufferCurrentIndex + 1) % 2;
 }
 
 void Particles::onResize(uint32_t width, uint32_t height) {
