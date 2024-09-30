@@ -16,12 +16,16 @@ public:
 		VkViewport viewport,
 		VkRect2D scissor,
 		uint32_t framesInFlight,
+		const std::vector<HostVisibleVulkanBuffer>& cameraBuffers,
 		PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR,
 		PFN_vkCmdEndRenderingKHR vkCmdEndRenderingKHR,
 		PFN_vkCmdPipelineBarrier2KHR vkCmdPipelineBarrier2KHR);
 	void destroy();
 
-	void draw(VkCommandBuffer commandBuffer, VkImage drawImage, VkImageView drawImageView, VkImageView depthImageView);
+	void draw(VkCommandBuffer commandBuffer, VkImage drawImage, VkImageView drawImageView, VkImage depthImage, VkImageView depthImageView, uint32_t currentFrameInFlight, float dt);
+
+	void onResize(uint32_t width,
+		uint32_t height);
 
 	void emitParticles(const NtshEngn::ParticleEmitter& particleEmitter, uint32_t currentFrameInFlight);
 
@@ -30,13 +34,13 @@ private:
 
 	void createComputeResources();
 
-	void createGraphicsResources(VkFormat drawImageFormat);
+	void createGraphicsResources(VkFormat drawImageFormat, const std::vector<HostVisibleVulkanBuffer>& cameraBuffers);
 
 private:
 	std::array<VulkanBuffer, 2> m_particleBuffers;
 	std::vector<HostVisibleVulkanBuffer> m_stagingBuffers;
 	VulkanBuffer m_drawIndirectBuffer;
-	std::vector<bool> m_buffersNeedUpdate;
+	std::vector<bool> m_particleBuffersNeedUpdate;
 	
 	VkDescriptorSetLayout m_computeDescriptorSetLayout;
 	VkDescriptorPool m_computeDescriptorPool;

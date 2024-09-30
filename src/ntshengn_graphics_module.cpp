@@ -575,13 +575,14 @@ void NtshEngn::GraphicsModule::init() {
 		m_graphicsComputeQueue,
 		m_graphicsComputeQueueFamilyIndex,
 		m_allocator,
-		m_drawImageFormat,
+		m_compositingImageFormat,
 		m_initializationCommandPool,
 		m_initializationCommandBuffer,
 		m_initializationFence,
 		m_viewport,
 		m_scissor,
 		m_framesInFlight,
+		m_cameraBuffers,
 		m_vkCmdBeginRenderingKHR,
 		m_vkCmdEndRenderingKHR,
 		m_vkCmdPipelineBarrier2KHR);
@@ -1193,7 +1194,38 @@ void NtshEngn::GraphicsModule::update(double dt) {
 	compositingBeforeParticlesDependencyInfo.pImageMemoryBarriers = &compositingBeforeParticlesImageMemoryBarrier;
 	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &compositingBeforeParticlesDependencyInfo);
 
-	m_particles.draw(m_renderingCommandBuffers[m_currentFrameInFlight], m_compositingImage.handle, m_compositingImage.view, m_gBuffer.getDepth().view);
+	m_particles.draw(m_renderingCommandBuffers[m_currentFrameInFlight], m_compositingImage.handle, m_compositingImage.view, m_gBuffer.getDepth().handle, m_gBuffer.getDepth().view, m_currentFrameInFlight, static_cast<float>(dt / 1000.0));
+
+	// Compositing synchronization after particles
+	VkImageMemoryBarrier2 compositingAfterParticlesImageMemoryBarrier = {};
+	compositingAfterParticlesImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+	compositingAfterParticlesImageMemoryBarrier.pNext = nullptr;
+	compositingAfterParticlesImageMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+	compositingAfterParticlesImageMemoryBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+	compositingAfterParticlesImageMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+	compositingAfterParticlesImageMemoryBarrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+	compositingAfterParticlesImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	compositingAfterParticlesImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	compositingAfterParticlesImageMemoryBarrier.srcQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	compositingAfterParticlesImageMemoryBarrier.dstQueueFamilyIndex = m_graphicsComputeQueueFamilyIndex;
+	compositingAfterParticlesImageMemoryBarrier.image = m_compositingImage.handle;
+	compositingAfterParticlesImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	compositingAfterParticlesImageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+	compositingAfterParticlesImageMemoryBarrier.subresourceRange.levelCount = 1;
+	compositingAfterParticlesImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
+	compositingAfterParticlesImageMemoryBarrier.subresourceRange.layerCount = 1;
+
+	VkDependencyInfo compositingAfterParticlesDependencyInfo = {};
+	compositingAfterParticlesDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	compositingAfterParticlesDependencyInfo.pNext = nullptr;
+	compositingAfterParticlesDependencyInfo.dependencyFlags = 0;
+	compositingAfterParticlesDependencyInfo.memoryBarrierCount = 0;
+	compositingAfterParticlesDependencyInfo.pMemoryBarriers = nullptr;
+	compositingAfterParticlesDependencyInfo.bufferMemoryBarrierCount = 0;
+	compositingAfterParticlesDependencyInfo.pBufferMemoryBarriers = nullptr;
+	compositingAfterParticlesDependencyInfo.imageMemoryBarrierCount = 1;
+	compositingAfterParticlesDependencyInfo.pImageMemoryBarriers = &compositingAfterParticlesImageMemoryBarrier;
+	m_vkCmdPipelineBarrier2KHR(m_renderingCommandBuffers[m_currentFrameInFlight], &compositingAfterParticlesDependencyInfo);
 
 #if BLOOM_ENABLE == 1
 	// Bloom
@@ -5439,6 +5471,9 @@ void NtshEngn::GraphicsModule::resize() {
 
 		// Resize SSAO
 		m_ssao.onResize(static_cast<uint32_t>(windowModule->getWindowWidth(windowModule->getMainWindowID())), static_cast<uint32_t>(windowModule->getWindowHeight(windowModule->getMainWindowID())), m_gBuffer.getPosition().view, m_gBuffer.getNormal().view);
+
+		// Resize particles
+		m_particles.onResize(static_cast<uint32_t>(windowModule->getWindowWidth(windowModule->getMainWindowID())), static_cast<uint32_t>(windowModule->getWindowHeight(windowModule->getMainWindowID())));
 
 #if BLOOM_ENABLE == 1
 		// Resize bloom
